@@ -1,15 +1,17 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { ResponsiveContainer, Treemap, Tooltip } from "recharts";
 import { probColor } from "@/lib/format";
 import type { TreemapNode } from "@/lib/mapData";
 
 interface ContentProps {
   x?: number; y?: number; width?: number; height?: number;
-  name?: string; prob?: number;
+  name?: string; prob?: number; id?: string;
+  onLeafClick?: (id: string) => void;
 }
 
 function TreemapCell(props: ContentProps) {
-  const { x = 0, y = 0, width = 0, height = 0, name = "", prob } = props;
+  const { x = 0, y = 0, width = 0, height = 0, name = "", prob, id, onLeafClick } = props;
   // Leaf/market nodes carry `prob`; category (parent) nodes don't. Testing on
   // `prob != null` is robust regardless of how Recharts numbers `depth` for a
   // 2-level (category -> market) tree.
@@ -26,6 +28,8 @@ function TreemapCell(props: ContentProps) {
         stroke="#0e1117"
         strokeWidth={isLeaf ? 1 : 2}
         fillOpacity={isLeaf ? 0.85 : 1}
+        style={isLeaf ? { cursor: "pointer" } : undefined}
+        onClick={isLeaf && id ? () => onLeafClick?.(id) : undefined}
       />
       {isLeaf && big && (
         <>
@@ -47,7 +51,9 @@ function TreemapCell(props: ContentProps) {
 }
 
 export function MarketTreemap({ data }: { data: TreemapNode[] }) {
+  const router = useRouter();
   if (!data.length) return <p className="text-sm text-muted">No markets to map.</p>;
+  const onLeafClick = (id: string) => router.push("/market/" + encodeURIComponent(id));
   return (
     <div
       role="img"
@@ -59,7 +65,7 @@ export function MarketTreemap({ data }: { data: TreemapNode[] }) {
           dataKey="size"
           nameKey="name"
           stroke="#0e1117"
-          content={<TreemapCell />}
+          content={<TreemapCell onLeafClick={onLeafClick} />}
           isAnimationActive={false}
         >
           <Tooltip

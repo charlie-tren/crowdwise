@@ -1,13 +1,21 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from "recharts";
 import { probColor } from "@/lib/format";
 import type { Market } from "@/lib/types";
 
 export function TimelineBubble({ markets }: { markets: Market[] }) {
+  const router = useRouter();
   const data = markets
     .filter((m) => m.prob != null && m.endDate)
-    .map((m) => ({ x: new Date(`${m.endDate}T00:00:00Z`).getTime(), y: +((m.prob as number) * 100).toFixed(1), z: m.volume || 1, title: m.title, prob: m.prob as number }));
+    .map((m) => ({ x: new Date(`${m.endDate}T00:00:00Z`).getTime(), y: +((m.prob as number) * 100).toFixed(1), z: m.volume || 1, title: m.title, prob: m.prob as number, id: m.id }));
   if (!data.length) return <p className="text-sm text-muted">No dated markets match the selected themes.</p>;
+
+  const onPointClick = (clickData: unknown) => {
+    const d = clickData as { id?: string; payload?: { id?: string } } | undefined;
+    const id = d?.id ?? d?.payload?.id;
+    if (id) router.push("/market/" + encodeURIComponent(id));
+  };
 
   const xs = data.map((d) => d.x);
   const dataMin = Math.min(...xs);
@@ -37,7 +45,9 @@ export function TimelineBubble({ markets }: { markets: Market[] }) {
             formatter={(v, n) => (n === "P" ? [`${v}%`, "P"] : [v, n])}
             labelFormatter={() => ""}
           />
-          <Scatter data={data}>{data.map((d, i) => <Cell key={i} fill={probColor(d.prob)} fillOpacity={0.85} />)}</Scatter>
+          <Scatter data={data} cursor="pointer" onClick={onPointClick}>
+            {data.map((d, i) => <Cell key={i} fill={probColor(d.prob)} fillOpacity={0.85} />)}
+          </Scatter>
         </ScatterChart>
       </ResponsiveContainer>
     </div>

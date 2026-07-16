@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ProbTimeline } from "./charts/ProbTimeline";
 import { ProbBadge } from "./ProbBadge";
+import { MarketCard } from "./MarketCard";
 import { fmtVol, daysTo } from "@/lib/format";
 import type { Market, HistoryPoint } from "@/lib/types";
 
-export function MarketDetail({ m }: { m: Market }) {
+export function MarketDetail({ m, related }: { m: Market; related?: Market[] }) {
   const [points, setPoints] = useState<HistoryPoint[] | null>(null);
   const [lookback, setLookback] = useState(90);
 
@@ -43,6 +44,16 @@ export function MarketDetail({ m }: { m: Market }) {
         </div>
       )}
       {points === null ? <p className="text-sm text-muted">Loading history…</p> : <ProbTimeline points={points} />}
+      {related?.length ? (
+        <div className="mt-10">
+          <h2 className="mb-3 text-sm font-semibold text-muted">More in {m.category}</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {related.map((r) => (
+              <MarketCard key={r.id} m={r} />
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

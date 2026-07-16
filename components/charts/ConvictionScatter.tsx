@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import {
   ScatterChart, Scatter, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, CartesianGrid, ReferenceLine,
@@ -8,7 +9,13 @@ import { THEME_COLOURS } from "@/lib/themeColours";
 import type { ScatterPoint } from "@/lib/mapData";
 
 export function ConvictionScatter({ points }: { points: ScatterPoint[] }) {
+  const router = useRouter();
   if (!points.length) return <p className="text-sm text-muted">No markets to map.</p>;
+  const onPointClick = (data: unknown) => {
+    const d = data as { id?: string; payload?: { id?: string } } | undefined;
+    const id = d?.id ?? d?.payload?.id;
+    if (id) router.push("/market/" + encodeURIComponent(id));
+  };
   return (
     <div
       role="img"
@@ -39,6 +46,8 @@ export function ConvictionScatter({ points }: { points: ScatterPoint[] }) {
               data={points.filter((p) => p.category === cat)}
               fill={THEME_COLOURS[cat] ?? "#4c9be8"}
               fillOpacity={0.6}
+              cursor="pointer"
+              onClick={onPointClick}
             />
           ))}
         </ScatterChart>

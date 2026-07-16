@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { MarketDetail } from "@/components/MarketDetail";
-import { fetchTopMarkets } from "@/lib/board";
+import { fetchTopMarkets, representativeByEvent } from "@/lib/board";
 
 export const revalidate = 300;
 export const maxDuration = 60;
@@ -20,5 +20,9 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
   const markets = await fetchTopMarkets();
   const m = markets.find((x) => x.id === id);
   if (!m) notFound();
-  return <MarketDetail m={m} />;
+  const related = representativeByEvent(markets)
+    .filter((r) => r.category === m.category && r.id !== m.id)
+    .sort((a, b) => (b.volume || 0) - (a.volume || 0))
+    .slice(0, 6);
+  return <MarketDetail m={m} related={related} />;
 }
