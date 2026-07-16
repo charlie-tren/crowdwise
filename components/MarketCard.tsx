@@ -9,13 +9,13 @@ export function MarketCard({ m, move }: { m: Market; move?: number }) {
   return (
     <Link
       href={`/market/${encodeURIComponent(m.id)}`}
-      className="flex flex-col gap-2 rounded-xl border border-white/[0.06] bg-panel/70 p-4 transition-colors hover:border-white/15 hover:bg-panel"
+      className="flex flex-col gap-2.5 rounded-xl border border-white/[0.06] bg-panel/70 p-5 transition-colors hover:border-white/15 hover:bg-panel"
     >
       <div className="flex items-start justify-between gap-3">
-        <span className="line-clamp-2 text-sm leading-snug text-[var(--text)]">{m.title}</span>
+        <span className="line-clamp-2 text-[15px] font-medium leading-snug text-[var(--text)]">{m.title}</span>
         <ProbBadge prob={m.prob} showMeter className="text-2xl" />
       </div>
-      <div className="flex items-center gap-3 text-xs text-muted">
+      <div className="mt-1 flex items-center gap-3 text-[13px] text-muted">
         <span>{m.platform}</span>
         <span>·</span>
         <span>Vol {fmtVol(m.volume)}</span>

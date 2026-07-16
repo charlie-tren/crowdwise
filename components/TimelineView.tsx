@@ -15,7 +15,7 @@ export function TimelineView({ markets }: { markets: Market[] }) {
     [markets, themes]);
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold">Timeline</h1>
+      <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Timeline</h1>
       <p className="mb-4 text-sm text-muted">
         Term structure of priced macro risk: each market by resolution date (x) and implied probability (y), bubble size = volume.
       </p>
@@ -23,7 +23,7 @@ export function TimelineView({ markets }: { markets: Market[] }) {
         {CATEGORIES.map((t) => <ThemeChip key={t} theme={t} active={themes.has(t)} onClick={() => toggle(t)} />)}
       </div>
       <TimelineBubble markets={pts} />
-      <p className="mt-2 text-xs text-muted">{pts.length} dated markets · bubble size proportional to volume · colour = probability.</p>
+      <p className="mt-2 text-[13px] text-muted">{pts.length} dated markets · bubble size proportional to volume · colour = probability.</p>
     </div>
   );
 }

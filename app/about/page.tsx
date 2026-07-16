@@ -7,7 +7,7 @@ export default function AboutPage() {
   const series = Object.entries(KALSHI_MACRO_SERIES).sort((a, b) => (a[1] + a[0]).localeCompare(b[1] + b[0]));
   return (
     <article className="max-w-none">
-      <h1 className="text-2xl font-semibold">About</h1>
+      <h1 className="text-[28px] font-semibold tracking-[-0.02em]">About</h1>
       <p className="mt-2 text-sm text-muted">
         Macro Signals shows live prediction-market probabilities across macro themes, pulled from the
         Kalshi and Polymarket public APIs and refreshed about every 10 minutes.

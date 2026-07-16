@@ -25,10 +25,10 @@ export function MarketDetail({ m, related }: { m: Market; related?: Market[] }) 
         ← Back to board
       </Link>
       <div className="mb-4 flex items-start justify-between gap-4">
-        <h1 className="text-xl font-semibold">{m.title}</h1>
+        <h1 className="text-[28px] font-semibold tracking-[-0.02em]">{m.title}</h1>
         <ProbBadge prob={m.prob} showMeter className="text-[40px]" />
       </div>
-      <div className="mb-6 flex flex-wrap gap-4 text-sm text-muted">
+      <div className="mb-6 flex flex-wrap gap-4 text-[13px] text-muted">
         <span>{m.category}</span><span>{m.platform}</span>
         <span>Vol {fmtVol(m.volume)}</span>
         <span>Resolves {m.endDate || "—"}{d != null && d >= 0 ? ` (${d}d)` : ""}</span>
@@ -46,7 +46,7 @@ export function MarketDetail({ m, related }: { m: Market; related?: Market[] }) 
       {points === null ? <p className="text-sm text-muted">Loading history…</p> : <ProbTimeline points={points} />}
       {related?.length ? (
         <div className="mt-10">
-          <h2 className="mb-3 text-sm font-semibold text-muted">More in {m.category}</h2>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.08em] text-muted">More in {m.category}</h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {related.map((r) => (
               <MarketCard key={r.id} m={r} />

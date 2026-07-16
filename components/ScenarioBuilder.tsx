@@ -49,7 +49,7 @@ export function ScenarioBuilder({ markets }: { markets: Market[] }) {
   const probs = legs.map((l) => l.prob as number);
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold">Scenario Builder</h1>
+      <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Scenario Builder</h1>
       <p className="mb-6 text-sm text-muted">
         Pick two or more markets to read the joint probability of all resolving YES, and of at least one.
         Both assume independence - real markets are often correlated, so treat these as bounds, not gospel.

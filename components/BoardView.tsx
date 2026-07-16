@@ -49,7 +49,7 @@ export function BoardView({ initial }: { initial: BoardPayload }) {
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <p className="text-xs text-muted">
+        <p className="text-[13px] text-muted">
           {filtered.length} markets · updated {new Date(initial.fetchedAt).toLocaleString()}
         </p>
         <div className="flex items-center gap-3">
@@ -70,18 +70,21 @@ export function BoardView({ initial }: { initial: BoardPayload }) {
           </button>
         </div>
       </div>
-      <p className="mb-4 text-xs text-muted">Bar length = implied probability.</p>
+      <p className="mb-4 text-[13px] text-muted">Bar length = implied probability.</p>
       <BoardFilters filters={filters} setFilters={setFilters} />
       {Object.keys(grouped).length === 0 && <p className="text-muted">No markets match the current filters.</p>}
       {Object.entries(grouped).map(([cat, members]) => {
         const total = totals[cat]?.length ?? members.length;
         return (
-          <section key={cat} className="mb-8">
-            <h2 className="mb-3 text-sm font-semibold text-muted">
-              {cat} · {total > members.length ? `${members.length} of ${total}` : total}
-            </h2>
+          <section key={cat} className="mb-10">
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">{cat}</h2>
+              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] tabular-nums text-muted">
+                {members.length}{total > members.length ? ` of ${total}` : ""}
+              </span>
+            </div>
             {view === "cards" ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {members.map((m) => <MarketCard key={m.id} m={m} move={initial.moves[m.id]} />)}
               </div>
             ) : (

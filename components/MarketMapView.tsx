@@ -27,7 +27,7 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
   if (!reps.length) {
     return (
       <div>
-        <h1 className="mb-1 text-2xl font-semibold">Market Map</h1>
+        <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Market Map</h1>
         <p className="text-sm text-muted">No markets to map.</p>
       </div>
     );
@@ -35,7 +35,7 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold">Market Map</h1>
+      <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Market Map</h1>
       <p className="mb-4 text-sm text-muted">
         Two views of where volume and conviction sit across the board - biggest markets by size, and where the
         crowd is genuinely undecided.
@@ -47,7 +47,7 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
         probability.
       </p>
       <MarketTreemap data={treemapData} />
-      <p className="mt-2 text-xs text-muted">
+      <p className="mt-2 text-[13px] text-muted">
         Volume mixes Kalshi contracts and Polymarket USD - compare within a theme, not across platforms.
       </p>
 

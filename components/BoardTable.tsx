@@ -4,7 +4,7 @@ import type { Market } from "@/lib/types";
 export function BoardTable({ markets, moves }: { markets: Market[]; moves: Record<string, number> }) {
   return (
     <table className="w-full text-sm">
-      <thead className="text-left text-xs text-muted">
+      <thead className="text-left text-[13px] text-muted">
         <tr>
           <th scope="col" className="py-2">Market</th>
           <th scope="col"><abbr title="Probability" className="no-underline">Prob</abbr></th>
@@ -22,7 +22,7 @@ export function BoardTable({ markets, moves }: { markets: Market[]; moves: Recor
             <tr key={m.id} className="border-t border-white/[0.06]">
               <td className="py-2 pr-3">{m.title.slice(0, 90)}</td>
               <td className="font-semibold tabular-nums text-[var(--text)]">{pct(m.prob)}</td>
-              <td className="tabular-nums" style={{ color: mv == null ? "#888" : mv >= 0 ? "#3fb27f" : "#e0714f" }}>
+              <td className="tabular-nums text-[13px]" style={{ color: mv == null ? "#888" : mv >= 0 ? "#3fb27f" : "#e0714f" }}>
                 {mv == null ? "—" : `${mv >= 0 ? "+" : ""}${(mv * 100).toFixed(1)}pp`}
               </td>
               <td>{fmtVol(m.volume)}</td>
