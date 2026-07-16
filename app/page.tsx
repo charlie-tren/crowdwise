@@ -22,7 +22,7 @@ export default async function HomePage() {
         Live prediction-market probabilities across macro themes, from the Kalshi &amp; Polymarket public APIs.
       </p>
       {board.markets.length === 0 ? (
-        <p className="text-muted">No live markets right now — check back shortly.</p>
+        <p className="text-muted">No live markets right now - check back shortly.</p>
       ) : (
         <BoardView initial={board} />
       )}
