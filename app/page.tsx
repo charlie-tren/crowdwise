@@ -1,16 +1,14 @@
 import { BoardView } from "@/components/BoardView";
-import { boardStore } from "@/lib/kvClient";
 import { fetchTopMarkets } from "@/lib/board";
 import type { BoardPayload } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+// ISR: the rendered board is cached and regenerated at most every 5 minutes, so
+// public traffic is served from cache rather than hitting the upstream APIs on
+// every request. No external store (KV) or cron needed.
+export const revalidate = 300;
 export const maxDuration = 60;
 
 async function getBoard(): Promise<BoardPayload> {
-  try {
-    const cached = await boardStore.readBoard();
-    if (cached) return cached;
-  } catch { /* fall through to direct fetch */ }
   const markets = await fetchTopMarkets();
   return { markets, moves: {}, fetchedAt: new Date().toISOString() };
 }

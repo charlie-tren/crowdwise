@@ -1,6 +1,6 @@
 # Macro Signals
 
-A public, read-only website showing live prediction-market probabilities (Kalshi + Polymarket) across macro themes - ported from the Vantage "Macro Signals" module. Built with Next.js (App Router) + TypeScript + Tailwind v4, Recharts, and Vercel KV.
+A public, read-only website showing live prediction-market probabilities (Kalshi + Polymarket) across macro themes - ported from the Vantage "Macro Signals" module. Built with Next.js (App Router) + TypeScript + Tailwind v4 and Recharts. Data is cached with Next.js ISR so public traffic is served from cache rather than hitting the upstream APIs on every request.
 
 ## Local development
 
@@ -13,21 +13,20 @@ npm run build
 
 Notes:
 
-- Without Vercel KV env vars set locally, the pages fall back to fetching the board directly from the upstream APIs on each request - this is fine for dev.
 - Polymarket's Gamma API is blocked on some networks (including corporate/AU ISPs), so locally you may only see Kalshi markets. From a US-hosted Vercel deployment, Polymarket is reachable.
 
 ## Architecture
 
-A Vercel Cron job (`vercel.json`, every ~10 minutes) calls `/api/cron/refresh`, which fetches and normalises both platforms and writes the board to Vercel KV plus a rolling snapshot (used for the "delta since last refresh"). Page traffic reads the cached board via `/api/board`, so the upstream APIs see one fetch per interval regardless of visitor count. Per-market history comes from `/api/history/[series]/[ticker]` (Kalshi candlesticks). The data/calc layer lives in `lib/` and is fully unit-tested with Vitest.
+Each page is an ISR (Incremental Static Regeneration) route with `revalidate = 300`: the rendered board is cached and regenerated at most once every 5 minutes, so the upstream APIs (Kalshi + Polymarket) are hit about once per interval per region rather than once per visitor. Per-market probability history comes from `/api/history/[series]/[ticker]` (Kalshi candlesticks, cached ~1h). The 7-day "top movers" chart is served by `/api/movers` (`revalidate = 600`), which computes candlestick deltas on demand. The data/calc layer lives in `lib/` and is fully unit-tested with Vitest.
+
+No external datastore or cron scheduler is required. A dormant KV path (`lib/kvClient.ts`, `/api/cron/refresh`) remains in the codebase: if a Vercel KV / Upstash store is later connected (setting `KV_REST_API_URL` + `KV_REST_API_TOKEN`), it can be re-enabled to add the "delta since last refresh" board chips and instant precomputed movers.
 
 ## Vercel deploy checklist
 
-1. Push the branch and import the repo into Vercel (Next.js preset auto-detected).
-2. Add the Vercel KV integration (Upstash) to the project - this sets `KV_REST_API_URL` and `KV_REST_API_TOKEN` automatically.
-3. Set a `CRON_SECRET` env var (any random string). Vercel Cron sends it as the `Authorization: Bearer <CRON_SECRET>` header; `/api/cron/refresh` rejects calls without it.
-4. Confirm the cron in `vercel.json` (`/api/cron/refresh`, `*/10 * * * *`) is registered (Vercel dashboard -> Cron Jobs).
-5. After first deploy, hit `/api/cron/refresh` once manually (with the bearer header) to seed the cache, or wait for the first cron tick.
-6. Add a custom domain.
+1. Import the repo into Vercel (Next.js preset auto-detected) and deploy - that's the core of it.
+2. Add a custom domain (Settings -> Domains) when ready.
+
+That's all the app needs. `CRON_SECRET` (env var) and the GitHub Actions workflows are only relevant if you re-enable the optional KV path above.
 
 ## Not financial advice
 
