@@ -4,6 +4,7 @@ import { fetchTopMarkets } from "@/lib/board";
 import type { BoardPayload } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 async function getBoard(): Promise<BoardPayload> {
   try {

@@ -42,14 +42,18 @@ export async function fetchKalshiSeriesMarkets(
 export async function fetchKalshiMarkets(
   series: Record<string, Category> = KALSHI_MACRO_SERIES, status = "open",
 ): Promise<Market[]> {
+  const entries = Object.entries(series);
+  const results = await Promise.allSettled(
+    entries.map(([seriesTicker, theme]) => fetchKalshiSeriesMarkets(seriesTicker, theme, status)),
+  );
   const out: Market[] = [];
-  for (const [seriesTicker, theme] of Object.entries(series)) {
-    try {
-      out.push(...(await fetchKalshiSeriesMarkets(seriesTicker, theme, status)));
-    } catch (err) {
-      console.warn(`Kalshi series ${seriesTicker} fetch failed`, err);
+  results.forEach((res, i) => {
+    if (res.status === "fulfilled") {
+      out.push(...res.value);
+    } else {
+      console.warn(`Kalshi series ${entries[i][0]} fetch failed`, res.reason);
     }
-  }
+  });
   return out;
 }
 

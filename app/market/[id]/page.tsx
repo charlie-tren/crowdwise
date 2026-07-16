@@ -5,6 +5,7 @@ import { fetchTopMarkets } from "@/lib/board";
 import type { Market } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export default async function MarketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: rawId } = await params;

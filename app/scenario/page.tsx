@@ -4,6 +4,7 @@ import { fetchTopMarkets } from "@/lib/board";
 import type { Market } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export default async function ScenarioPage() {
   let markets: Market[] | undefined;
