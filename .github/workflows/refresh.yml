@@ -1,0 +1,26 @@
+name: Refresh board
+
+# Vercel Hobby plan only allows once-daily cron, so the ~10-min board refresh is
+# driven from here instead. Requires two repo secrets:
+#   DEPLOY_URL   - the deployed site origin, e.g. https://macro-signals-web.vercel.app
+#   CRON_SECRET  - must match the CRON_SECRET env var set in Vercel
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit the refresh endpoint
+        env:
+          DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$DEPLOY_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "DEPLOY_URL / CRON_SECRET repo secrets not set yet - skipping."
+            exit 0
+          fi
+          curl -fsS --max-time 90 -X GET "$DEPLOY_URL/api/cron/refresh" \
+            -H "Authorization: Bearer $CRON_SECRET"
