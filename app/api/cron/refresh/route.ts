@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { fetchTopMarkets } from "@/lib/board";
 import { boardStore } from "@/lib/kvClient";
+import { computeTopMovers } from "@/lib/movers";
+import { fetchKalshiMarketHistory } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -13,5 +15,14 @@ export async function GET(req: Request) {
   const markets = await fetchTopMarkets();
   const fetchedAt = new Date().toISOString();
   if (markets.length) await boardStore.writeBoard(markets, fetchedAt);
+
+  // Precompute top movers into KV too - best-effort, never fails the board refresh.
+  try {
+    const movers = await computeTopMovers(markets, (s, t) => fetchKalshiMarketHistory(s, t, { days: 7, periodInterval: 60 }));
+    await boardStore.writeMovers(movers);
+  } catch (err) {
+    console.warn("movers precompute failed", err);
+  }
+
   return NextResponse.json({ ok: true, count: markets.length, fetchedAt });
 }
