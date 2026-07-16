@@ -5,7 +5,14 @@ export function BoardTable({ markets, moves }: { markets: Market[]; moves: Recor
   return (
     <table className="w-full text-sm">
       <thead className="text-left text-xs text-muted">
-        <tr><th className="py-2">Market</th><th>P</th><th>Δ</th><th>Vol</th><th>Resolves</th><th>Platform</th></tr>
+        <tr>
+          <th scope="col" className="py-2">Market</th>
+          <th scope="col"><abbr title="Probability" className="no-underline">Prob</abbr></th>
+          <th scope="col"><abbr title="Change since last refresh" className="no-underline">Δ</abbr></th>
+          <th scope="col">Vol</th>
+          <th scope="col">Resolves</th>
+          <th scope="col">Platform</th>
+        </tr>
       </thead>
       <tbody>
         {markets.map((m) => {

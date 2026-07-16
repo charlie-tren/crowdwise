@@ -1,8 +1,10 @@
+import type { Metadata } from "next";
 import { MarketMapView } from "@/components/MarketMapView";
 import { fetchTopMarkets } from "@/lib/board";
 
 export const revalidate = 300;
 export const maxDuration = 60;
+export const metadata: Metadata = { title: "Market Map · Macro Signals" };
 
 export default async function MarketMapPage() {
   const markets = await fetchTopMarkets();

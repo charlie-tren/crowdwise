@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
 import { KALSHI_MACRO_SERIES } from "@/lib/taxonomy";
+
+export const metadata: Metadata = { title: "About · Macro Signals" };
 
 export default function AboutPage() {
   const series = Object.entries(KALSHI_MACRO_SERIES).sort((a, b) => (a[1] + a[0]).localeCompare(b[1] + b[0]));
