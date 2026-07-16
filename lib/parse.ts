@@ -10,6 +10,12 @@ export function isoDate(value: unknown): string {
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
+// Strip the markdown bold markers Kalshi embeds in market titles (e.g.
+// "Will **real GDP** increase..."), which would otherwise render raw as text.
+export function stripMarkdown(s: string): string {
+  return s.replace(/\*\*(.*?)\*\*/g, "$1").replace(/__(.*?)__/g, "$1");
+}
+
 export function clampProb(p: number | null): number | null {
   if (p === null || p === undefined) return null;
   return Math.min(Math.max(p, 0), 1);

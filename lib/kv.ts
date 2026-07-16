@@ -1,4 +1,5 @@
 import { computeMoves } from "./history";
+import type { Mover } from "./movers";
 import type { Market, Snapshot, BoardPayload } from "./types";
 
 export interface KvLike {
@@ -8,6 +9,7 @@ export interface KvLike {
 
 const BOARD_KEY = "board:current";
 const SNAP_KEY = "board:snapshots";
+const MOVERS_KEY = "board:movers";
 
 export function makeKvStore(kv: KvLike, opts: { maxSnapshots?: number } = {}) {
   const maxSnapshots = opts.maxSnapshots ?? 200;
@@ -39,5 +41,13 @@ export function makeKvStore(kv: KvLike, opts: { maxSnapshots?: number } = {}) {
     return await kv.get<BoardPayload>(BOARD_KEY);
   }
 
-  return { readSnapshots, appendSnapshot, writeBoard, readBoard };
+  async function writeMovers(movers: Mover[]): Promise<void> {
+    await kv.set(MOVERS_KEY, movers);
+  }
+
+  async function readMovers(): Promise<Mover[] | null> {
+    return await kv.get<Mover[]>(MOVERS_KEY);
+  }
+
+  return { readSnapshots, appendSnapshot, writeBoard, readBoard, writeMovers, readMovers };
 }

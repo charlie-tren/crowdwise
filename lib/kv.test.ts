@@ -40,4 +40,15 @@ describe("kv store", () => {
     expect(snaps.length).toBe(3);
     expect(snaps.map((s) => s.ts)).toEqual(["t3", "t4", "t5"]);
   });
+
+  it("writeMovers then readMovers roundtrips", async () => {
+    await store.writeMovers([{ id: "a", title: "t-a", category: "Rates/Fed", move: -0.3 }]);
+    const movers = await store.readMovers();
+    expect(movers?.length).toBe(1);
+    expect(movers?.[0].move).toBeCloseTo(-0.3);
+  });
+
+  it("readMovers returns null when unset", async () => {
+    expect(await store.readMovers()).toBeNull();
+  });
 });

@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { toFloat, isoDate, clampProb, firstOutcomePrice, kalshiProb } from "./parse";
+import { toFloat, isoDate, clampProb, firstOutcomePrice, kalshiProb, stripMarkdown } from "./parse";
 
 describe("parse helpers", () => {
+  it("stripMarkdown removes bold markers", () => {
+    expect(stripMarkdown("Will **real GDP** increase?")).toBe("Will real GDP increase?");
+    expect(stripMarkdown("__jobs__ report")).toBe("jobs report");
+    expect(stripMarkdown("plain title")).toBe("plain title");
+  });
   it("toFloat ok", () => { expect(toFloat("12.5")).toBe(12.5); expect(toFloat(7)).toBe(7); });
   it("toFloat junk -> default", () => {
     expect(toFloat(null)).toBe(0); expect(toFloat("")).toBe(0); expect(toFloat("abc", -1)).toBe(-1);
