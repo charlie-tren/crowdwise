@@ -6,7 +6,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    include: ["lib/**/*.test.ts", "components/**/*.test.tsx", "test/**/*.test.ts"],
+    include: ["lib/**/*.test.ts", "components/**/*.test.tsx", "test/**/*.test.ts", "app/**/*.test.ts", "app/**/*.test.tsx"],
   },
   resolve: { alias: { "@": new URL(".", import.meta.url).pathname } },
 });
