@@ -1,7 +1,7 @@
 import { CATEGORIES } from "./taxonomy";
 import type { Market } from "./types";
 
-export interface TreemapLeaf { name: string; size: number; prob: number; title: string; }
+export interface TreemapLeaf { id: string; name: string; size: number; prob: number; title: string; }
 export interface TreemapNode { name: string; children: TreemapLeaf[]; }
 
 const MAX_TITLE = 40;
@@ -22,6 +22,7 @@ export function buildTreemap(markets: Market[], limit = 45): TreemapNode[] {
     nodes.push({
       name: cat,
       children: members.map((m) => ({
+        id: m.id,
         name: truncate(m.title),
         size: m.volume,
         prob: m.prob as number,
@@ -33,11 +34,12 @@ export function buildTreemap(markets: Market[], limit = 45): TreemapNode[] {
 }
 
 // Markets with a prob and volume>0, shaped for the conviction scatter.
-export interface ScatterPoint { x: number; y: number; category: string; title: string; }
+export interface ScatterPoint { id: string; x: number; y: number; category: string; title: string; }
 export function buildScatter(markets: Market[]): ScatterPoint[] {
   return markets
     .filter((m) => m.prob != null && m.volume > 0)
     .map((m) => ({
+      id: m.id,
       x: +((m.prob as number) * 100).toFixed(1),
       y: m.volume,
       category: m.category,

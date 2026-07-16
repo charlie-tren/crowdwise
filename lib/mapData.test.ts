@@ -19,6 +19,8 @@ describe("buildTreemap", () => {
     expect(Object.keys(byName).sort()).toEqual(["Inflation", "Rates/Fed"]); // Geopolitics + null dropped
     expect(byName["Rates/Fed"].children.map((l) => l.title).sort()).toEqual(["t-a", "t-b"]);
     expect(byName["Inflation"].children[0].size).toBe(200);
+    const leafA = byName["Rates/Fed"].children.find((l) => l.title === "t-a");
+    expect(leafA?.id).toBe("a");
   });
   it("caps to the top N by volume across all markets", () => {
     const mkts = Array.from({ length: 60 }, (_, i) => m(`x${i}`, "Rates/Fed", 0.5, i + 1));
@@ -32,6 +34,6 @@ describe("buildScatter", () => {
   it("keeps prob+vol markets, maps to x=prob%, y=volume", () => {
     const pts = buildScatter([m("a", "Rates/Fed", 0.5, 100), m("b", "Inflation", null, 5), m("c", "Inflation", 0.2, 0)]);
     expect(pts.length).toBe(1);
-    expect(pts[0]).toMatchObject({ x: 50, y: 100, category: "Rates/Fed", title: "t-a" });
+    expect(pts[0]).toMatchObject({ id: "a", x: 50, y: 100, category: "Rates/Fed", title: "t-a" });
   });
 });

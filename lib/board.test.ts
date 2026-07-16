@@ -31,6 +31,47 @@ describe("fetchTopMarkets", () => {
     expect(out.length).toBe(1);
     expect(out[0].category).toBe("Rates/Fed");
   });
+
+  it("drops a near-extreme Elections/Politics longshot despite high volume", async () => {
+    sources.setHttpGetJson(async (url) => {
+      if (url.includes("elections.kalshi")) return { markets: [] };
+      return [
+        {
+          conditionId: "0xlongshot", question: "Will Jane Doe win the 2028 presidential election?",
+          outcomePrices: '["0.01","0.99"]', volumeNum: 50000, active: true,
+        },
+      ];
+    });
+    const out = await fetchTopMarkets();
+    expect(out.map((r) => r.id)).not.toContain("0xlongshot");
+  });
+
+  it("keeps an Elections/Politics market at a non-extreme probability", async () => {
+    sources.setHttpGetJson(async (url) => {
+      if (url.includes("elections.kalshi")) return { markets: [] };
+      return [
+        {
+          conditionId: "0xcompetitive", question: "Will Jane Doe win the 2028 presidential election?",
+          outcomePrices: '["0.45","0.55"]', volumeNum: 50000, active: true,
+        },
+      ];
+    });
+    const out = await fetchTopMarkets();
+    const kept = out.find((r) => r.id === "0xcompetitive");
+    expect(kept).toBeDefined();
+    expect(kept?.category).toBe("Elections/Politics");
+  });
+
+  it("keeps a Rates/Fed market at prob 0.01 (filter is Elections-only)", async () => {
+    sources.setHttpGetJson(async (url) => {
+      if (url.includes("elections.kalshi")) {
+        return { markets: [{ ticker: "KXFED-A", title: "Fed cut?", last_price_dollars: "0.01", volume_fp: "30", status: "active" }] };
+      }
+      return [];
+    });
+    const out = await fetchTopMarkets();
+    expect(out.map((r) => r.id)).toContain("KXFED-A");
+  });
 });
 
 describe("groupByCategory", () => {

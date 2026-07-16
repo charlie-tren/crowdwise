@@ -23,7 +23,18 @@ export async function fetchTopMarkets(includeKalshi = true, includePolymarket = 
     const key = `${r.platform}:${r.id}`;
     if (!deduped.has(key)) deduped.set(key, r);
   }
-  const out = [...deduped.values()];
+  const dedupedValues = [...deduped.values()];
+  // Polymarket carries high-volume novelty/longshot nomination markets in
+  // Elections/Politics (e.g. "Will LeBron James win the 2028 nomination?")
+  // sitting at ~0-1% (or ~99%+) probability. These aren't macro signal, but
+  // their volume lets them dominate a volume-sorted board/treemap, so drop
+  // near-extreme Elections/Politics markets before sorting. Other themes
+  // (e.g. Kalshi macro tail-risks like recession or an emergency Fed
+  // meeting) are left untouched even at extreme probabilities.
+  const out = dedupedValues.filter((r) => {
+    if (r.category !== "Elections/Politics" || r.prob == null) return true;
+    return !(r.prob < 0.02 || r.prob > 0.98);
+  });
   out.sort((a, b) => (b.volume || 0) - (a.volume || 0));
   return out;
 }
