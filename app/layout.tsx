@@ -15,6 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <nav className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3 text-sm">
             <Link href="/" className="font-semibold text-[var(--text)]">Macro Signals</Link>
             <Link href="/timeline" className="text-muted hover:text-[var(--text)]">Timeline</Link>
+            <Link href="/map" className="text-muted hover:text-[var(--text)]">Map</Link>
             <Link href="/scenario" className="text-muted hover:text-[var(--text)]">Scenario</Link>
             <Link href="/about" className="ml-auto text-muted hover:text-[var(--text)]">About</Link>
           </nav>
