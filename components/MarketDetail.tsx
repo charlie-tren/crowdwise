@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { ProbTimeline } from "./charts/ProbTimeline";
 import { ProbBadge } from "./ProbBadge";
 import { fmtVol, daysTo } from "@/lib/format";
@@ -19,6 +20,9 @@ export function MarketDetail({ m }: { m: Market }) {
   const d = daysTo(m.endDate);
   return (
     <div>
+      <Link href="/" className="mb-4 inline-block text-xs text-muted hover:text-[var(--text)]">
+        ← Back to board
+      </Link>
       <div className="mb-4 flex items-start justify-between gap-4">
         <h1 className="text-xl font-semibold">{m.title}</h1>
         <ProbBadge prob={m.prob} className="text-3xl" />

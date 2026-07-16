@@ -4,22 +4,47 @@ import { jointYes, atLeastOne } from "@/lib/scenario";
 import { pct } from "@/lib/format";
 import { LegBars } from "./charts/LegBars";
 import { representativeByEvent } from "@/lib/board";
+import { CATEGORIES } from "@/lib/taxonomy";
+import { ThemeChip } from "./ThemeChip";
 import type { Market } from "@/lib/types";
 
+const FOCUS_RING = "focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
+
 export function ScenarioBuilder({ markets }: { markets: Market[] }) {
-  const options = useMemo(() => {
+  const allOptions = useMemo(() => {
     const opts = representativeByEvent(markets).filter((r) => r.prob != null);
     opts.sort((a, b) => (b.volume || 0) - (a.volume || 0));
     return opts.slice(0, 150);
   }, [markets]);
 
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const legs = options.filter((o) => picked.has(o.id));
+  const [search, setSearch] = useState("");
+  const [themes, setThemes] = useState<Set<string>>(new Set(CATEGORIES));
+  const [hideLongshots, setHideLongshots] = useState(true);
+
+  const toggleTheme = (t: string) => {
+    const next = new Set(themes);
+    next.has(t) ? next.delete(t) : next.add(t);
+    setThemes(next);
+  };
+
+  const legs = allOptions.filter((o) => picked.has(o.id));
   const toggle = (id: string) => {
     const next = new Set(picked);
     next.has(id) ? next.delete(id) : next.add(id);
     setPicked(next);
   };
+
+  const q = search.trim().toLowerCase();
+  const visibleOptions = useMemo(() => {
+    return allOptions.filter((o) => {
+      if (picked.has(o.id)) return true; // picked legs stay visible/selectable regardless of filters
+      if (q && !o.title.toLowerCase().includes(q)) return false;
+      if (!themes.has(o.category)) return false;
+      if (hideLongshots && o.prob != null && (o.prob < 0.02 || o.prob > 0.98)) return false;
+      return true;
+    });
+  }, [allOptions, picked, q, themes, hideLongshots]);
 
   const probs = legs.map((l) => l.prob as number);
   return (
@@ -36,8 +61,25 @@ export function ScenarioBuilder({ markets }: { markets: Market[] }) {
         </div>
       )}
       {legs.length >= 2 && <div className="mb-6"><LegBars legs={legs} /></div>}
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="flex flex-wrap gap-2">
+          {CATEGORIES.map((t) => <ThemeChip key={t} theme={t} active={themes.has(t)} onClick={() => toggleTheme(t)} />)}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            placeholder="Search markets…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className={`w-56 rounded-lg border border-white/10 bg-panel/40 px-3 py-1.5 text-sm placeholder:text-muted outline-none ${FOCUS_RING}`}
+          />
+          <label className="flex items-center gap-2 text-xs text-muted">
+            <input type="checkbox" checked={hideLongshots} onChange={(e) => setHideLongshots(e.target.checked)} />
+            Hide longshots (&lt;2% or &gt;98%)
+          </label>
+        </div>
+      </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {options.map((o) => (
+        {visibleOptions.map((o) => (
           <label key={o.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-sm ${picked.has(o.id) ? "border-accent" : "border-white/10"}`}>
             <input type="checkbox" checked={picked.has(o.id)} onChange={() => toggle(o.id)} />
             <span className="text-muted">[{o.category}]</span>
