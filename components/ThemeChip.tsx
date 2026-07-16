@@ -1,7 +1,4 @@
-const THEME_COLOURS: Record<string, string> = {
-  "Rates/Fed": "#4c9be8", Inflation: "#f97316", "Growth/Recession": "#22c55e",
-  "Commodities/Oil": "#eab308", Geopolitics: "#ef4444", "Elections/Politics": "#b39ddb",
-};
+import { THEME_COLOURS } from "@/lib/themeColours";
 
 export function ThemeChip({ theme, active = true, onClick }: { theme: string; active?: boolean; onClick?: () => void }) {
   const c = THEME_COLOURS[theme] ?? "#4c9be8";

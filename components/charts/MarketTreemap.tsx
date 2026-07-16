@@ -1,18 +1,23 @@
 "use client";
-import { ResponsiveContainer, Treemap } from "recharts";
+import { ResponsiveContainer, Treemap, Tooltip } from "recharts";
 import { probColor } from "@/lib/format";
 import type { TreemapNode } from "@/lib/mapData";
 
 interface ContentProps {
   x?: number; y?: number; width?: number; height?: number;
-  name?: string; prob?: number; depth?: number;
+  name?: string; prob?: number;
 }
 
 function TreemapCell(props: ContentProps) {
-  const { x = 0, y = 0, width = 0, height = 0, name = "", prob, depth = 0 } = props;
-  const isLeaf = depth === 1 && prob != null;
-  const fill = isLeaf ? probColor(prob as number) : "#141826";
+  const { x = 0, y = 0, width = 0, height = 0, name = "", prob } = props;
+  // Leaf/market nodes carry `prob`; category (parent) nodes don't. Testing on
+  // `prob != null` is robust regardless of how Recharts numbers `depth` for a
+  // 2-level (category -> market) tree.
+  const isLeaf = prob != null;
+  const fill = isLeaf ? probColor(prob as number) : "#1b2030";
   const big = width > 60 && height > 28;
+  const maxChars = Math.max(6, Math.floor(width / 7));
+  const label = name.length > maxChars ? `${name.slice(0, maxChars - 1)}…` : name;
   return (
     <g>
       <rect
@@ -24,12 +29,14 @@ function TreemapCell(props: ContentProps) {
       />
       {isLeaf && big && (
         <>
-          <text x={x + 6} y={y + 16} fontSize={11} fill="#0e1117" fontWeight={600}>
-            {name.length > width / 6 ? `${name.slice(0, Math.max(4, Math.floor(width / 6)))}…` : name}
+          <text x={x + 6} y={y + 16} fontSize={11} fill="#fafafa" fontWeight={600}>
+            {label}
           </text>
-          <text x={x + 6} y={y + 30} fontSize={11} fill="#0e1117">
-            {`${((prob as number) * 100).toFixed(0)}%`}
-          </text>
+          {height > 44 && (
+            <text x={x + 6} y={y + 30} fontSize={11} fill="#fafafa">
+              {`${((prob as number) * 100).toFixed(0)}%`}
+            </text>
+          )}
         </>
       )}
       {!isLeaf && width > 40 && (
@@ -42,7 +49,10 @@ function TreemapCell(props: ContentProps) {
 export function MarketTreemap({ data }: { data: TreemapNode[] }) {
   if (!data.length) return <p className="text-sm text-muted">No markets to map.</p>;
   return (
-    <div>
+    <div
+      role="img"
+      aria-label="Treemap of markets by theme, tile size by trading volume, tile colour by implied probability"
+    >
       <ResponsiveContainer width="100%" height={520}>
         <Treemap
           data={data as unknown as Record<string, unknown>[]}
@@ -51,7 +61,18 @@ export function MarketTreemap({ data }: { data: TreemapNode[] }) {
           stroke="#0e1117"
           content={<TreemapCell />}
           isAnimationActive={false}
-        />
+        >
+          <Tooltip
+            contentStyle={{ background: "#0e1117", border: "1px solid #1e2130", color: "#fafafa" }}
+            formatter={(value, _name, item) => {
+              const payload = (item?.payload ?? {}) as { title?: string; name?: string; prob?: number };
+              const label = payload.title ?? payload.name ?? "";
+              if (payload.prob != null) return [`${(payload.prob * 100).toFixed(0)}%`, label];
+              return [value, label];
+            }}
+            labelFormatter={() => ""}
+          />
+        </Treemap>
       </ResponsiveContainer>
       <p className="mt-2 text-xs text-muted">Tile colour: green = low probability, red = high probability.</p>
     </div>
