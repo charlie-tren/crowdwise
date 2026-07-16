@@ -9,11 +9,11 @@ export function MarketCard({ m, move }: { m: Market; move?: number }) {
   return (
     <Link
       href={`/market/${encodeURIComponent(m.id)}`}
-      className="flex flex-col gap-2 rounded-xl border border-white/10 bg-panel/70 p-4 shadow-sm shadow-black/30 transition-colors hover:border-white/25 hover:bg-panel"
+      className="flex flex-col gap-2 rounded-xl border border-white/[0.06] bg-panel/70 p-4 transition-colors hover:border-white/15 hover:bg-panel"
     >
       <div className="flex items-start justify-between gap-3">
         <span className="line-clamp-2 text-sm leading-snug text-[var(--text)]">{m.title}</span>
-        <ProbBadge prob={m.prob} className="text-xl" />
+        <ProbBadge prob={m.prob} showMeter className="text-2xl" />
       </div>
       <div className="flex items-center gap-3 text-xs text-muted">
         <span>{m.platform}</span>
@@ -22,7 +22,7 @@ export function MarketCard({ m, move }: { m: Market; move?: number }) {
         <span>·</span>
         <span>{resolves}</span>
         {move != null && Math.abs(move) >= 0.001 && (
-          <span className="ml-auto tabular-nums" style={{ color: move >= 0 ? "#22c55e" : "#ef4444" }}>
+          <span className="ml-auto tabular-nums" style={{ color: move >= 0 ? "#3fb27f" : "#e0714f" }}>
             {move >= 0 ? "+" : ""}{(move * 100).toFixed(1)}pp
           </span>
         )}

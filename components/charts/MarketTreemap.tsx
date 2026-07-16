@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { ResponsiveContainer, Treemap, Tooltip } from "recharts";
-import { probColor } from "@/lib/format";
+import { probFill } from "@/lib/format";
 import type { TreemapNode } from "@/lib/mapData";
 
 interface ContentProps {
@@ -16,7 +16,7 @@ function TreemapCell(props: ContentProps) {
   // `prob != null` is robust regardless of how Recharts numbers `depth` for a
   // 2-level (category -> market) tree.
   const isLeaf = prob != null;
-  const fill = isLeaf ? probColor(prob as number) : "#1b2030";
+  const fill = isLeaf ? probFill(prob as number) : "#1b2030";
   const big = width > 60 && height > 28;
   const maxChars = Math.max(6, Math.floor(width / 7));
   const label = name.length > maxChars ? `${name.slice(0, maxChars - 1)}…` : name;
@@ -33,11 +33,11 @@ function TreemapCell(props: ContentProps) {
       />
       {isLeaf && big && (
         <>
-          <text x={x + 6} y={y + 16} fontSize={11} fill="#fafafa" fontWeight={600}>
+          <text x={x + 6} y={y + 16} fontSize={11} fill={(prob ?? 0) > 0.55 ? "#0e1117" : "#fafafa"} fontWeight={600}>
             {label}
           </text>
           {height > 44 && (
-            <text x={x + 6} y={y + 30} fontSize={11} fill="#fafafa">
+            <text x={x + 6} y={y + 30} fontSize={11} fill={(prob ?? 0) > 0.55 ? "#0e1117" : "#fafafa"}>
               {`${((prob as number) * 100).toFixed(0)}%`}
             </text>
           )}
@@ -80,7 +80,7 @@ export function MarketTreemap({ data }: { data: TreemapNode[] }) {
           />
         </Treemap>
       </ResponsiveContainer>
-      <p className="mt-2 text-xs text-muted">Tile colour: green = low probability, red = high probability.</p>
+      <p className="mt-2 text-xs text-muted">Tile brightness = implied probability.</p>
     </div>
   );
 }

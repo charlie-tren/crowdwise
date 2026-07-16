@@ -2,8 +2,8 @@
 
 @theme {
   --color-bg: #0e1117;
-  --color-panel: #262730;
-  --color-muted: #888888;
+  --color-panel: #161a23;
+  --color-muted: #9aa4b2;
   --color-accent: #4c9be8;
   --color-pos: #22c55e;
   --color-warn: #eab308;
@@ -13,9 +13,10 @@
 
 :root {
   --bg: #0e1117;
-  --panel: #262730;
+  --panel: #161a23;
   --text: #fafafa;
-  --muted: #888888;
+  --muted: #9aa4b2;
+  --muted-dim: #6b7280;
   --accent: #4c9be8;
   --green: #22c55e;
   --yellow: #eab308;

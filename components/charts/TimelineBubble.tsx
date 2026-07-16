@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from "recharts";
-import { probColor } from "@/lib/format";
+import { probFill } from "@/lib/format";
 import type { Market } from "@/lib/types";
 
 export function TimelineBubble({ markets }: { markets: Market[] }) {
@@ -46,7 +46,7 @@ export function TimelineBubble({ markets }: { markets: Market[] }) {
             labelFormatter={() => ""}
           />
           <Scatter data={data} cursor="pointer" onClick={onPointClick}>
-            {data.map((d, i) => <Cell key={i} fill={probColor(d.prob)} fillOpacity={0.85} />)}
+            {data.map((d, i) => <Cell key={i} fill={probFill(d.prob)} fillOpacity={0.85} />)}
           </Scatter>
         </ScatterChart>
       </ResponsiveContainer>

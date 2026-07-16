@@ -18,10 +18,28 @@ export function pct(p: number | null, decimals = 1): string {
   return `${(p * 100).toFixed(decimals)}%`;
 }
 
-export function probColor(p: number | null): string {
-  if (p == null) return "#888888";
-  if (p < 0.25) return "#22c55e";
-  if (p < 0.50) return "#eab308";
-  if (p < 0.75) return "#f97316";
-  return "#ef4444";
+// Single-hue (blue) sequential ramp. Probability = magnitude, NOT sentiment.
+// No green/yellow/red. The number itself stays neutral (--text); this drives
+// meter bars + chart fills only.
+const PROB_STOPS: Array<[number, [number, number, number]]> = [
+  [0.0, [0x33, 0x41, 0x5a]],
+  [0.25, [0x3f, 0x65, 0x97]],
+  [0.5, [0x4c, 0x8b, 0xd0]],
+  [0.75, [0x5a, 0xa9, 0xee]],
+  [1.0, [0x7c, 0xc4, 0xff]],
+];
+
+export function probFill(p: number | null): string {
+  if (p == null) return "#3a4256";
+  const x = Math.max(0, Math.min(1, p));
+  for (let i = 1; i < PROB_STOPS.length; i++) {
+    const [p1, c1] = PROB_STOPS[i];
+    const [p0, c0] = PROB_STOPS[i - 1];
+    if (x <= p1) {
+      const t = (x - p0) / (p1 - p0);
+      const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
+      return `rgb(${mix(c0[0], c1[0])}, ${mix(c0[1], c1[1])}, ${mix(c0[2], c1[2])})`;
+    }
+  }
+  return "#7cc4ff";
 }

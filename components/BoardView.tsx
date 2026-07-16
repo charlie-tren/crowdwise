@@ -70,7 +70,7 @@ export function BoardView({ initial }: { initial: BoardPayload }) {
           </button>
         </div>
       </div>
-      <p className="mb-4 text-xs text-muted">Colour = implied probability: green low → red high.</p>
+      <p className="mb-4 text-xs text-muted">Bar length = implied probability.</p>
       <BoardFilters filters={filters} setFilters={setFilters} />
       {Object.keys(grouped).length === 0 && <p className="text-muted">No markets match the current filters.</p>}
       {Object.entries(grouped).map(([cat, members]) => {

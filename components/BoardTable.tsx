@@ -1,4 +1,4 @@
-import { pct, fmtVol, probColor, daysTo } from "@/lib/format";
+import { pct, fmtVol, daysTo } from "@/lib/format";
 import type { Market } from "@/lib/types";
 
 export function BoardTable({ markets, moves }: { markets: Market[]; moves: Record<string, number> }) {
@@ -19,10 +19,10 @@ export function BoardTable({ markets, moves }: { markets: Market[]; moves: Recor
           const mv = moves[m.id];
           const d = daysTo(m.endDate);
           return (
-            <tr key={m.id} className="border-t border-white/5">
+            <tr key={m.id} className="border-t border-white/[0.06]">
               <td className="py-2 pr-3">{m.title.slice(0, 90)}</td>
-              <td style={{ color: probColor(m.prob) }} className="font-bold tabular-nums">{pct(m.prob)}</td>
-              <td className="tabular-nums" style={{ color: mv == null ? "#888" : mv >= 0 ? "#22c55e" : "#ef4444" }}>
+              <td className="font-semibold tabular-nums text-[var(--text)]">{pct(m.prob)}</td>
+              <td className="tabular-nums" style={{ color: mv == null ? "#888" : mv >= 0 ? "#3fb27f" : "#e0714f" }}>
                 {mv == null ? "—" : `${mv >= 0 ? "+" : ""}${(mv * 100).toFixed(1)}pp`}
               </td>
               <td>{fmtVol(m.volume)}</td>

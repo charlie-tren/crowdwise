@@ -26,7 +26,7 @@ export function MarketDetail({ m, related }: { m: Market; related?: Market[] }) 
       </Link>
       <div className="mb-4 flex items-start justify-between gap-4">
         <h1 className="text-xl font-semibold">{m.title}</h1>
-        <ProbBadge prob={m.prob} className="text-3xl" />
+        <ProbBadge prob={m.prob} showMeter className="text-[40px]" />
       </div>
       <div className="mb-6 flex flex-wrap gap-4 text-sm text-muted">
         <span>{m.category}</span><span>{m.platform}</span>

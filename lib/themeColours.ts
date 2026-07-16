@@ -1,6 +1,6 @@
 // Qualitative palette for theme/category identity. Deliberately shares no hues
-// with the green/yellow/orange/red probability ramp (see probColor in
-// lib/format.ts) so theme colour and probability colour are never confusable.
+// with the blue sequential probability ramp (see probFill in lib/format.ts)
+// so theme colour and probability colour are never confusable.
 export const THEME_COLOURS: Record<string, string> = {
   "Rates/Fed": "#4c9be8",
   Inflation: "#ec4899",
