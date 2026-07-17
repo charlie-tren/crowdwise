@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="border-t border-white/10">
           <div className="mx-auto max-w-6xl px-4 py-4 text-xs text-[var(--muted-dim)]">
             Data: Kalshi &amp; Polymarket public APIs · refreshed ~5 min · For information only - not financial advice. See{" "}
-            <Link href="/about" className="underline hover:text-[var(--text)]">About</Link>.
+            <Link href="/about" className="underline hover:text-[var(--text)]">About</Link>. · v0.3.0
           </div>
         </footer>
       </body>

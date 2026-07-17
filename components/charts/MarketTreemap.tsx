@@ -91,7 +91,9 @@ export function MarketTreemap({ data }: { data: TreemapNode[] }) {
           isAnimationActive={false}
         >
           <Tooltip
-            contentStyle={{ background: "#0e1117", border: "1px solid #1e2130", color: "#fafafa" }}
+            contentStyle={{ background: "#0e1117", border: "1px solid #2a3348", color: "#fafafa", borderRadius: 8, fontSize: 13 }}
+            itemStyle={{ color: "#fafafa" }}
+            labelStyle={{ color: "#9aa4b2" }}
             formatter={(value, _name, item) => {
               const payload = (item?.payload ?? {}) as { title?: string; name?: string; prob?: number };
               const label = payload.title ?? payload.name ?? "";

@@ -55,9 +55,15 @@ export function ScenarioBuilder({ markets }: { markets: Market[] }) {
         Both assume independence - real markets are often correlated, so treat these as bounds, not gospel.
       </p>
       {legs.length >= 2 && (
-        <div className="mb-6 flex gap-8">
-          <div><div className="text-xs text-muted">P(all resolve YES)</div><div className="text-2xl font-bold text-accent">{pct(jointYes(probs))}</div></div>
-          <div><div className="text-xs text-muted">P(at least one)</div><div className="text-2xl font-bold text-accent">{pct(atLeastOne(probs))}</div></div>
+        <div className="mb-6 flex gap-4">
+          <div className="rounded-xl border border-white/[0.06] bg-panel/60 p-4">
+            <div className="text-[13px] text-muted">P(all resolve YES)</div>
+            <div className="text-2xl font-semibold tabular-nums text-accent">{pct(jointYes(probs))}</div>
+          </div>
+          <div className="rounded-xl border border-white/[0.06] bg-panel/60 p-4">
+            <div className="text-[13px] text-muted">P(at least one)</div>
+            <div className="text-2xl font-semibold tabular-nums text-accent">{pct(atLeastOne(probs))}</div>
+          </div>
         </div>
       )}
       {legs.length >= 2 && <div className="mb-6"><LegBars legs={legs} /></div>}
@@ -80,10 +86,15 @@ export function ScenarioBuilder({ markets }: { markets: Market[] }) {
       </div>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {visibleOptions.map((o) => (
-          <label key={o.id} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2 text-sm ${picked.has(o.id) ? "border-accent" : "border-white/10"}`}>
+          <label
+            key={o.id}
+            className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm transition-colors ${
+              picked.has(o.id) ? "border-accent bg-accent/[0.08]" : "border-white/[0.06]"
+            }`}
+          >
             <input type="checkbox" checked={picked.has(o.id)} onChange={() => toggle(o.id)} />
-            <span className="text-muted">[{o.category}]</span>
-            <span className="flex-1">{o.title.slice(0, 80)}</span>
+            <span className="text-[13px] text-muted">[{o.category}]</span>
+            <span className="flex-1 text-[var(--text)]">{o.title.slice(0, 80)}</span>
             <span className="tabular-nums text-muted">{pct(o.prob, 0)}</span>
           </label>
         ))}

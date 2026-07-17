@@ -23,7 +23,7 @@ export function TimelineView({ markets }: { markets: Market[] }) {
         {CATEGORIES.map((t) => <ThemeChip key={t} theme={t} active={themes.has(t)} onClick={() => toggle(t)} />)}
       </div>
       <TimelineBubble markets={pts} />
-      <p className="mt-2 text-[13px] text-muted">{pts.length} dated markets · bubble size proportional to volume · colour = probability.</p>
+      <p className="mt-2 text-[13px] text-muted">{pts.length} dated markets · bubble size proportional to volume · colour = theme.</p>
     </div>
   );
 }
