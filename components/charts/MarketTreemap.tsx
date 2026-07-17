@@ -16,35 +16,57 @@ function TreemapCell(props: ContentProps) {
   // `prob != null` is robust regardless of how Recharts numbers `depth` for a
   // 2-level (category -> market) tree.
   const isLeaf = prob != null;
-  const fill = isLeaf ? probFill(prob as number) : "#1b2030";
-  const big = width > 60 && height > 28;
-  const maxChars = Math.max(6, Math.floor(width / 7));
+  const fill = isLeaf ? probFill(prob as number) : "#161a23";
+  // Round to integer device pixels - fractional SVG coords render blurry text.
+  const rx = Math.round(x), ry = Math.round(y), rw = Math.round(width), rh = Math.round(height);
+  const big = rw > 54 && rh > 24;
+  const maxChars = Math.max(6, Math.floor(rw / 7.5));
   const label = name.length > maxChars ? `${name.slice(0, maxChars - 1)}…` : name;
   return (
     <g>
       <rect
-        x={x} y={y} width={width} height={height}
+        x={rx} y={ry} width={rw} height={rh}
         fill={fill}
         stroke="#0e1117"
         strokeWidth={isLeaf ? 1 : 2}
-        fillOpacity={isLeaf ? 0.85 : 1}
         style={isLeaf ? { cursor: "pointer" } : undefined}
         onClick={isLeaf && id ? () => onLeafClick?.(id) : undefined}
       />
       {isLeaf && big && (
-        <>
-          <text x={x + 6} y={y + 16} fontSize={11} fill={(prob ?? 0) > 0.55 ? "#0e1117" : "#fafafa"} fontWeight={600}>
-            {label}
-          </text>
-          {height > 44 && (
-            <text x={x + 6} y={y + 30} fontSize={11} fill={(prob ?? 0) > 0.55 ? "#0e1117" : "#fafafa"}>
+        // White text with a dark outline (paintOrder stroke) stays legible on any
+        // tile colour across the gradient - fixes the low-contrast/blurry labels.
+        <text
+          x={rx + 8}
+          y={ry + 18}
+          fontSize={12}
+          fontWeight={600}
+          fill="#ffffff"
+          stroke="#0b0e17"
+          strokeWidth={3}
+          strokeLinejoin="round"
+          paintOrder="stroke"
+          style={{ pointerEvents: "none" }}
+        >
+          {label}
+          {rh > 40 && (
+            <tspan x={rx + 8} dy={16} fontWeight={500} fillOpacity={0.9}>
               {`${((prob as number) * 100).toFixed(0)}%`}
-            </text>
+            </tspan>
           )}
-        </>
+        </text>
       )}
-      {!isLeaf && width > 40 && (
-        <text x={x + 6} y={y + 16} fontSize={12} fill="#c9ccd6" fontWeight={600}>{name}</text>
+      {!isLeaf && rw > 40 && (
+        <text
+          x={rx + 8}
+          y={ry + 16}
+          fontSize={11}
+          fontWeight={700}
+          letterSpacing="0.05em"
+          fill="#9aa4b2"
+          style={{ pointerEvents: "none", textTransform: "uppercase" }}
+        >
+          {name.toUpperCase()}
+        </text>
       )}
     </g>
   );
