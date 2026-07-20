@@ -6,6 +6,7 @@ const LINKS = [
   { href: "/map", label: "Map" },
   { href: "/scenario", label: "Scenario" },
   { href: "/cross-venue", label: "Compare" },
+  { href: "/value", label: "Value" },
   { href: "/timeline", label: "Timeline" },
   { href: "/about", label: "About" },
 ];
