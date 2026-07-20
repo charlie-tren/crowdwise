@@ -42,14 +42,11 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
       </p>
 
       <h2 className="mb-1 text-lg font-medium">Biggest markets by volume</h2>
-      <p className="mb-2 text-sm text-muted">
-        Top {TREEMAP_LIMIT} markets by volume, grouped by theme - tile size = volume, tile colour = implied
-        probability.
+      <p className="mb-3 text-sm text-muted">
+        The top {TREEMAP_LIMIT} markets by volume, grouped by theme. Larger tiles trade more; brighter tiles
+        carry a higher implied probability.
       </p>
       <MarketTreemap data={treemapData} />
-      <p className="mt-2 text-[13px] text-muted">
-        Volume mixes Kalshi contracts and Polymarket USD - compare within a theme, not across platforms.
-      </p>
 
       <hr className="my-8 border-white/10" />
 

@@ -3,10 +3,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "/timeline", label: "Timeline" },
   { href: "/map", label: "Map" },
   { href: "/scenario", label: "Scenario" },
-  { href: "/cross-venue", label: "Cross-Venue" },
+  { href: "/cross-venue", label: "Compare" },
+  { href: "/timeline", label: "Timeline" },
   { href: "/about", label: "About" },
 ];
 
@@ -16,9 +16,9 @@ export function Nav() {
     <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
       <Link
         href="/"
-        className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.01em] text-[var(--text)]"
+        className="mr-2 flex items-center gap-2.5 text-[22px] font-semibold tracking-[-0.015em] text-[var(--text)]"
       >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <svg width="28" height="28" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <circle cx="10" cy="10" r="8.2" stroke="#2f5a86" strokeWidth="1" />
           <circle cx="10" cy="10" r="4.6" stroke="#2f5a86" strokeWidth="0.9" />
           <path d="M10 10 L15.8 4.2 A8.2 8.2 0 0 1 18.2 8.4 Z" fill="#4c9be8" fillOpacity="0.28" />

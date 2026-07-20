@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseFedProposition, findCrossVenue } from "./crossVenue";
+import { parseFedProposition, parseProposition, findCrossVenue } from "./crossVenue";
 import type { Market } from "./types";
 
 let seq = 0;
@@ -194,6 +194,65 @@ describe("findCrossVenue", () => {
       prob: 0.10,
     });
     const out = findCrossVenue([kalshiJuly, polySeptember]);
+    expect(out).toHaveLength(0);
+  });
+
+  it("pairs the same recession-year proposition across venues", () => {
+    const kalshi = m({
+      platform: "Kalshi",
+      category: "Growth/Recession",
+      title: "Will the US be in a recession in 2026?",
+      endDate: "2026-12-31",
+      prob: 0.32,
+    });
+    const poly = m({
+      platform: "Polymarket",
+      category: "Growth/Recession",
+      title: "US recession in 2026?",
+      endDate: "2026-12-31",
+      prob: 0.4,
+    });
+    const out = findCrossVenue([kalshi, poly]);
+    expect(out).toHaveLength(1);
+    expect(out[0].type).toBe("recession");
+    expect(out[0].label).toBe("US recession in 2026");
+    expect(out[0].divergence).toBeCloseTo(0.08, 5);
+  });
+
+  it("does NOT pair an annual recession market with a quarterly one (different propositions)", () => {
+    const kalshiQ = m({
+      platform: "Kalshi",
+      category: "Growth/Recession",
+      title: "Will the US be in a recession in Q3 2026?",
+      endDate: "2026-09-30",
+      prob: 0.2,
+    });
+    const polyAnnual = m({
+      platform: "Polymarket",
+      category: "Growth/Recession",
+      title: "US recession in 2026?",
+      endDate: "2026-12-31",
+      prob: 0.4,
+    });
+    const out = findCrossVenue([kalshiQ, polyAnnual]);
+    expect(out).toHaveLength(0);
+  });
+
+  it("does not pair a Fed proposition with a recession one", () => {
+    const fed = m({
+      platform: "Kalshi",
+      title: "Will the Federal Reserve Cut rates by 25bps at their 2026 meeting?",
+      endDate: "2026-09-16",
+      prob: 0.3,
+    });
+    const rec = m({
+      platform: "Polymarket",
+      category: "Growth/Recession",
+      title: "US recession in 2026?",
+      endDate: "2026-12-31",
+      prob: 0.3,
+    });
+    const out = findCrossVenue([fed, rec]);
     expect(out).toHaveLength(0);
   });
 

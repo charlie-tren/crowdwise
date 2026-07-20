@@ -7,15 +7,14 @@ const DIVERGENCE_NOTABLE = 0.05;
 export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
   return (
     <div>
-      <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Cross-Venue Prices</h1>
+      <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Kalshi vs Polymarket</h1>
       <p className="mb-6 text-[13px] text-muted">
-        Where Kalshi and Polymarket price the same Fed-decision outcome, side by side. Divergence is how far the
-        two venues disagree - not risk-free arbitrage; resolution terms, fees and settlement differ between
-        platforms.
+        Where both venues price the exact same outcome, side by side. Divergence is how far the two venues
+        disagree - not risk-free arbitrage; resolution terms, fees and settlement differ between platforms.
       </p>
       {pairs.length === 0 ? (
         <p className="text-[13px] text-muted">
-          No overlapping Fed-decision markets priced on both venues right now.
+          No matching propositions priced on both venues right now.
         </p>
       ) : (
         <div className="flex flex-col gap-3">
@@ -23,7 +22,7 @@ export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
             const notable = pair.divergence >= DIVERGENCE_NOTABLE;
             return (
               <div
-                key={`${pair.ym}|${pair.action}|${pair.bps}`}
+                key={pair.key}
                 className="rounded-xl border border-white/[0.06] bg-panel/60 p-5"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -69,7 +68,7 @@ export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
         </div>
       )}
       <p className="mt-6 text-[13px] text-[var(--muted-dim)]">
-        Fed rate decisions only. For information only - not financial advice.
+        Matched on identical outcomes (Fed decisions, recession) only. For information only - not financial advice.
       </p>
     </div>
   );

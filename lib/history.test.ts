@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { computeMoves, historyMove, topMovers, themeConviction, marketProbSeries } from "./history";
+import type { Snapshot } from "./types";
 
 describe("computeMoves", () => {
   it("delta vs latest snapshot; omits ids not in snapshot", () => {
@@ -57,7 +58,7 @@ describe("themeConviction", () => {
 
 describe("marketProbSeries", () => {
   it("builds per-id oldest-first with gaps", () => {
-    const hist = [{ ts: "2026-06-01", probs: { a: 0.5, b: 0.3 } }, { ts: "2026-06-02", probs: { a: 0.6 } }];
+    const hist: Snapshot[] = [{ ts: "2026-06-01", probs: { a: 0.5, b: 0.3 } }, { ts: "2026-06-02", probs: { a: 0.6 } }];
     const out = marketProbSeries(hist);
     expect(out.a).toEqual([["2026-06-01", 0.5], ["2026-06-02", 0.6]]);
     expect(out.b).toEqual([["2026-06-01", 0.3]]);

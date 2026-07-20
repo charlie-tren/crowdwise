@@ -1,0 +1,102 @@
+import { describe, it, expect } from "vitest";
+import { headlineOdds, fedDistribution } from "./highlights";
+import type { Market } from "./types";
+
+let seq = 0;
+const m = (overrides: Partial<Market> = {}): Market => {
+  seq += 1;
+  return {
+    id: `id-${seq}`,
+    platform: "Kalshi",
+    title: "Untitled",
+    category: "Rates/Fed",
+    prob: 0.5,
+    volume: 1000,
+    endDate: "2026-09-16",
+    status: "active",
+    series: "KX",
+    event: "",
+    ...overrides,
+  };
+};
+
+describe("headlineOdds", () => {
+  it("picks the highest-volume market per requested theme, in order", () => {
+    const tiles = headlineOdds(
+      [
+        m({ category: "Rates/Fed", title: "Fed small", volume: 100, prob: 0.6 }),
+        m({ category: "Rates/Fed", title: "Fed big", volume: 900, prob: 0.7 }),
+        m({ category: "Growth/Recession", title: "Recession", volume: 500, prob: 0.3 }),
+      ],
+      ["Rates/Fed", "Growth/Recession"],
+    );
+    expect(tiles.map((t) => t.title)).toEqual(["Fed big", "Recession"]);
+    expect(tiles[0].prob).toBe(0.7);
+  });
+
+  it("skips themes with no priced market and ignores prob-less markets", () => {
+    const tiles = headlineOdds(
+      [
+        m({ category: "Rates/Fed", prob: null, volume: 999 }),
+        m({ category: "Inflation", title: "CPI", prob: 0.44, volume: 200 }),
+      ],
+      ["Rates/Fed", "Inflation"],
+    );
+    expect(tiles).toHaveLength(1);
+    expect(tiles[0].title).toBe("CPI");
+  });
+});
+
+describe("fedDistribution", () => {
+  const meeting = (title: string, prob: number, volume = 1000, ym = "2026-09") =>
+    m({ platform: "Kalshi", title, prob, volume, endDate: `${ym}-16` });
+
+  it("builds the nearest-meeting outcome distribution sorted cut->hold->hike", () => {
+    const dist = fedDistribution(
+      [
+        meeting("Will the Fed Cut rates by 25bps at their September 2026 meeting?", 0.55),
+        meeting("Will the Fed Hike rates by 0bps at their September 2026 meeting?", 0.4),
+        meeting("Will the Fed Hike rates by 25bps at their September 2026 meeting?", 0.05),
+      ],
+      "2026-01",
+    );
+    expect(dist).not.toBeNull();
+    expect(dist!.ym).toBe("2026-09");
+    expect(dist!.outcomes.map((o) => o.label)).toEqual(["Cut 25", "Hold", "Hike 25"]);
+    expect(dist!.total).toBeCloseTo(1.0, 5);
+  });
+
+  it("selects the nearest upcoming meeting, not a past one", () => {
+    const dist = fedDistribution(
+      [
+        meeting("Will the Fed Cut rates by 25bps at their July 2026 meeting?", 0.9, 1000, "2026-07"),
+        meeting("Will the Fed Hike rates by 0bps at their July 2026 meeting?", 0.1, 1000, "2026-07"),
+        meeting("Will the Fed Cut rates by 25bps at their December 2026 meeting?", 0.5, 1000, "2026-12"),
+        meeting("Will the Fed Hike rates by 0bps at their December 2026 meeting?", 0.5, 1000, "2026-12"),
+      ],
+      "2026-09",
+    );
+    expect(dist!.ym).toBe("2026-12");
+  });
+
+  it("returns null when fewer than two outcomes are priced", () => {
+    const dist = fedDistribution(
+      [meeting("Will the Fed Cut rates by 25bps at their September 2026 meeting?", 0.55)],
+      "2026-01",
+    );
+    expect(dist).toBeNull();
+  });
+
+  it("takes the highest-volume market for each outcome", () => {
+    const dist = fedDistribution(
+      [
+        meeting("Will the Fed Cut rates by 25bps at their September 2026 meeting?", 0.5, 100),
+        meeting("Will the Fed Cut rates by 25bps at their September 2026 meeting?", 0.6, 900),
+        meeting("Will the Fed Hike rates by 0bps at their September 2026 meeting?", 0.4, 500),
+      ],
+      "2026-01",
+    );
+    const cut = dist!.outcomes.find((o) => o.label === "Cut 25");
+    expect(cut!.prob).toBe(0.6);
+  });
+});
