@@ -1,6 +1,6 @@
 # Crowdwise
 
-A public, read-only website showing live prediction-market probabilities (Kalshi + Polymarket) across macro themes - ported from the Vantage "Crowdwise" module. Built with Next.js (App Router) + TypeScript + Tailwind v4 and Recharts. Data is cached with Next.js ISR so public traffic is served from cache rather than hitting the upstream APIs on every request.
+A public, read-only website showing live prediction-market probabilities (Kalshi + Polymarket) across macro themes - ported from the "Macro Signals" module of the author's Vantage app. Built with Next.js (App Router) + TypeScript + Tailwind v4 and Recharts. Data is cached with Next.js ISR so public traffic is served from cache rather than hitting the upstream APIs on every request.
 
 Note: the repo name and deploy id remain `macro-signals-web` (historical) - only the display name changed to Crowdwise.
 
