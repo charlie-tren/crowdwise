@@ -63,6 +63,14 @@ export function parseFedProposition(m: Market): FedProposition | null {
 
   const normalized = normalizeBpsPhrasing(m.title.toLowerCase());
 
+  // Must be the US Federal Reserve. The board's Rates/Fed theme also carries
+  // ECB / Bank of Japan / Bank of Russia decision markets (same category, same
+  // "25bps increase July 2026" shape), which would otherwise share a proposition
+  // key with a Fed market and produce a false cross-venue pair / corrupt the Fed
+  // distribution.
+  if (!/federal reserve|federal funds|\bfomc\b|\bfed\b/.test(normalized)) return null;
+  if (/\becb\b|european central|bank of (japan|england|russia|canada)|\bboj\b|\bboe\b/.test(normalized)) return null;
+
   const isHold = normalized.includes("no change") || /\b0bps\b/.test(normalized);
 
   let action: FedAction;
@@ -123,6 +131,10 @@ function recessionProposition(m: Market): Proposition | null {
 
   const t = m.title.toLowerCase();
   if (!t.includes("recession")) return null;
+
+  // US recession only - a "Japan recession in 2026" must not share a key with a
+  // US recession market on the other venue.
+  if (!/\bu\.?s\.?\b|\bunited states\b|\bamerican\b/.test(t)) return null;
 
   const yearMatch = t.match(/\b(20\d{2})\b/);
   if (!yearMatch) return null;

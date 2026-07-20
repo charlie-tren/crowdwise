@@ -95,6 +95,24 @@ describe("parseFedProposition", () => {
     expect(parseFedProposition(market)).toBeNull();
   });
 
+  it("returns null for an ECB decision market (not the US Fed)", () => {
+    const market = m({
+      platform: "Polymarket",
+      title: "Will the ECB announce a 25 bps increase at the July 2026 meeting?",
+      endDate: "2026-07-24",
+    });
+    expect(parseFedProposition(market)).toBeNull();
+  });
+
+  it("returns null for a Bank of Japan rates market", () => {
+    const market = m({
+      platform: "Polymarket",
+      title: "No change in Bank of Japan's interest rates after the July 2026 meeting?",
+      endDate: "2026-07-31",
+    });
+    expect(parseFedProposition(market)).toBeNull();
+  });
+
   it("returns null for a Fed hike title with no bps figure", () => {
     const market = m({
       platform: "Kalshi",
@@ -235,6 +253,42 @@ describe("findCrossVenue", () => {
       prob: 0.4,
     });
     const out = findCrossVenue([kalshiQ, polyAnnual]);
+    expect(out).toHaveLength(0);
+  });
+
+  it("does NOT pair an ECB market with a Kalshi Fed market on the same bps/month", () => {
+    const kalshiFed = m({
+      platform: "Kalshi",
+      title: "Will the Federal Reserve Hike rates by 25bps at their July 2026 meeting?",
+      endDate: "2026-07-29",
+      prob: 0.06,
+    });
+    const polyECB = m({
+      platform: "Polymarket",
+      title: "Will the ECB announce a 25 bps increase at the July 2026 meeting?",
+      endDate: "2026-07-24",
+      prob: 0.76,
+    });
+    const out = findCrossVenue([kalshiFed, polyECB]);
+    expect(out).toHaveLength(0);
+  });
+
+  it("does NOT pair a Japan recession with a US recession of the same year", () => {
+    const kalshiUS = m({
+      platform: "Kalshi",
+      category: "Growth/Recession",
+      title: "Will the US be in a recession in 2026?",
+      endDate: "2026-12-31",
+      prob: 0.32,
+    });
+    const polyJapan = m({
+      platform: "Polymarket",
+      category: "Growth/Recession",
+      title: "Japan recession in 2026?",
+      endDate: "2026-12-31",
+      prob: 0.09,
+    });
+    const out = findCrossVenue([kalshiUS, polyJapan]);
     expect(out).toHaveLength(0);
   });
 
