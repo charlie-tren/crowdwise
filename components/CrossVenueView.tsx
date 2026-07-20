@@ -64,7 +64,7 @@ export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
                     </span>
                   </Link>
                 </div>
-                {notable && (
+                {pair.divergence >= 0.005 && (
                   <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-[13px]">
                     <span className="rounded bg-accent/15 px-1.5 py-0.5 font-medium text-accent">
                       YES cheaper on {cheaperName}
