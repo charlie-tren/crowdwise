@@ -43,7 +43,7 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
 
       <h2 className="mb-1 text-lg font-medium">Biggest markets by volume</h2>
       <p className="mb-3 text-sm text-muted">
-        The top {TREEMAP_LIMIT} markets by volume, grouped by theme. Larger tiles trade more; brighter tiles
+        The largest markets by volume (top {TREEMAP_LIMIT}), grouped by theme. Larger tiles trade more; brighter tiles
         carry a higher implied probability.
       </p>
       <MarketTreemap data={treemapData} />

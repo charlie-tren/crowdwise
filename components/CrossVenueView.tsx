@@ -20,6 +20,11 @@ export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
         <div className="flex flex-col gap-3">
           {pairs.map((pair) => {
             const notable = pair.divergence >= DIVERGENCE_NOTABLE;
+            const kalshiCheaper = pair.kalshiProb <= pair.polymarketProb;
+            const cheaperName = kalshiCheaper ? "Kalshi" : "Polymarket";
+            const cheaperProb = kalshiCheaper ? pair.kalshiProb : pair.polymarketProb;
+            const dearerName = kalshiCheaper ? "Polymarket" : "Kalshi";
+            const dearerProb = kalshiCheaper ? pair.polymarketProb : pair.kalshiProb;
             return (
               <div
                 key={pair.key}
@@ -59,6 +64,16 @@ export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
                     </span>
                   </Link>
                 </div>
+                {notable && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-[13px]">
+                    <span className="rounded bg-accent/15 px-1.5 py-0.5 font-medium text-accent">
+                      YES cheaper on {cheaperName}
+                    </span>
+                    <span className="text-muted">
+                      {cheaperName} {pct(cheaperProb)} vs {dearerName} {pct(dearerProb)} - {(pair.divergence * 100).toFixed(1)}pp gap
+                    </span>
+                  </div>
+                )}
                 <p className="mt-3 text-[13px] text-muted">
                   {pair.kalshi.title} · {pair.polymarket.title}
                 </p>

@@ -1,8 +1,9 @@
 import { BoardView } from "@/components/BoardView";
 import { HeadlineOdds } from "@/components/HeadlineOdds";
 import { FedDistributionBar, meetingLabel } from "@/components/charts/FedDistributionBar";
+import { FedPathChart } from "@/components/charts/FedPathChart";
 import { fetchTopMarkets } from "@/lib/board";
-import { headlineOdds, fedDistribution } from "@/lib/highlights";
+import { headlineOdds, fedDistribution, fedPath } from "@/lib/highlights";
 import type { BoardPayload } from "@/lib/types";
 
 // ISR: the rendered board is cached and regenerated at most every 5 minutes, so
@@ -22,6 +23,7 @@ export default async function HomePage() {
   const now = new Date();
   const todayYm = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
   const fed = fedDistribution(board.markets, todayYm);
+  const path = fedPath(board.markets, todayYm);
 
   return (
     <>
@@ -43,6 +45,17 @@ export default async function HomePage() {
                 Market-implied odds across the possible FOMC outcomes.
               </p>
               <FedDistributionBar dist={fed} />
+            </section>
+          )}
+
+          {path.length >= 2 && (
+            <section className="mb-8">
+              <h2 className="mb-1 text-lg font-medium">Implied Fed path</h2>
+              <p className="mb-3 text-sm text-muted">
+                Market-implied cumulative rate change across upcoming meetings (bps vs today) - negative means
+                easing is priced in.
+              </p>
+              <FedPathChart points={path} />
             </section>
           )}
 

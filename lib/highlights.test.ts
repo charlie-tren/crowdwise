@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headlineOdds, fedDistribution } from "./highlights";
+import { headlineOdds, fedDistribution, fedPath } from "./highlights";
 import type { Market } from "./types";
 
 let seq = 0;
@@ -32,6 +32,28 @@ describe("headlineOdds", () => {
     );
     expect(tiles.map((t) => t.title)).toEqual(["Fed big", "Recession"]);
     expect(tiles[0].prob).toBe(0.7);
+  });
+
+  it("prefers a clean directional market over a narrow strike/bucket one", () => {
+    const tiles = headlineOdds(
+      [
+        m({ category: "Growth/Recession", title: "When will the next U.S. recession start?", volume: 900, prob: 0.02 }),
+        m({ category: "Growth/Recession", title: "US recession in 2026?", volume: 300, prob: 0.4 }),
+      ],
+      ["Growth/Recession"],
+    );
+    expect(tiles[0].title).toBe("US recession in 2026?");
+  });
+
+  it("falls back to top volume when every market in a theme is narrow", () => {
+    const tiles = headlineOdds(
+      [
+        m({ category: "Inflation", title: "Will CPI be above 3.5%?", volume: 100, prob: 0.2 }),
+        m({ category: "Inflation", title: "Will CPI be above 4.0%?", volume: 500, prob: 0.1 }),
+      ],
+      ["Inflation"],
+    );
+    expect(tiles[0].title).toBe("Will CPI be above 4.0%?");
   });
 
   it("skips themes with no priced market and ignores prob-less markets", () => {
@@ -98,5 +120,43 @@ describe("fedDistribution", () => {
     );
     const cut = dist!.outcomes.find((o) => o.label === "Cut 25");
     expect(cut!.prob).toBe(0.6);
+  });
+});
+
+describe("fedPath", () => {
+  const mk = (title: string, prob: number, ym: string, volume = 1000) =>
+    m({ platform: "Kalshi", title, prob, volume, endDate: `${ym}-16` });
+
+  it("accumulates probability-weighted expected bps across meetings", () => {
+    const path = fedPath(
+      [
+        // Sep: 55% cut25, 40% hold, 5% hike25 -> E = -12.5bps
+        mk("Will the Fed Cut rates by 25bps at their September 2026 meeting?", 0.55, "2026-09"),
+        mk("Will the Fed Hike rates by 0bps at their September 2026 meeting?", 0.4, "2026-09"),
+        mk("Will the Fed Hike rates by 25bps at their September 2026 meeting?", 0.05, "2026-09"),
+        // Dec: 60% cut25, 40% hold -> E = -15bps ; cumulative -27.5
+        mk("Will the Fed Cut rates by 25bps at their December 2026 meeting?", 0.6, "2026-12"),
+        mk("Will the Fed Hike rates by 0bps at their December 2026 meeting?", 0.4, "2026-12"),
+      ],
+      "2026-01",
+    );
+    expect(path.map((p) => p.ym)).toEqual(["2026-09", "2026-12"]);
+    expect(path[0].expectedBps).toBeCloseTo(-12.5, 1);
+    expect(path[0].cumulativeBps).toBeCloseTo(-12.5, 1);
+    expect(path[1].expectedBps).toBeCloseTo(-15, 1);
+    expect(path[1].cumulativeBps).toBeCloseTo(-27.5, 1);
+  });
+
+  it("skips a meeting with a single priced outcome and drops past meetings", () => {
+    const path = fedPath(
+      [
+        mk("Will the Fed Cut rates by 25bps at their July 2026 meeting?", 0.9, "2026-07"), // past + single
+        mk("Will the Fed Cut rates by 25bps at their September 2026 meeting?", 0.5, "2026-09"), // single -> skipped
+        mk("Will the Fed Cut rates by 25bps at their December 2026 meeting?", 0.6, "2026-12"),
+        mk("Will the Fed Hike rates by 0bps at their December 2026 meeting?", 0.4, "2026-12"),
+      ],
+      "2026-08",
+    );
+    expect(path.map((p) => p.ym)).toEqual(["2026-12"]);
   });
 });
