@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { ProbBadge } from "./ProbBadge";
+import { Sparkline } from "./charts/Sparkline";
 import { fmtVol, daysTo } from "@/lib/format";
 import type { Market } from "@/lib/types";
 
-export function MarketCard({ m, move }: { m: Market; move?: number }) {
+export function MarketCard({ m, move, spark }: { m: Market; move?: number; spark?: number[] }) {
   const d = daysTo(m.endDate);
   const resolves = d != null && d >= 0 ? `in ${d}d` : m.endDate || "—";
+  const showMove = move != null && Math.abs(move) >= 0.001;
   return (
     <Link
       href={`/market/${encodeURIComponent(m.id)}`}
@@ -21,9 +23,14 @@ export function MarketCard({ m, move }: { m: Market; move?: number }) {
         <span>Vol {fmtVol(m.volume)}</span>
         <span>·</span>
         <span>{resolves}</span>
-        {move != null && Math.abs(move) >= 0.001 && (
-          <span className="ml-auto tabular-nums" style={{ color: move >= 0 ? "#3fb27f" : "#e0714f" }}>
-            {move >= 0 ? "+" : ""}{(move * 100).toFixed(1)}pp
+        {(spark || showMove) && (
+          <span className="ml-auto flex items-center gap-2">
+            {spark && spark.length >= 2 && <Sparkline values={spark} />}
+            {showMove && (
+              <span className="tabular-nums" style={{ color: (move as number) >= 0 ? "#3fb27f" : "#e0714f" }}>
+                {(move as number) >= 0 ? "+" : ""}{((move as number) * 100).toFixed(1)}pp
+              </span>
+            )}
           </span>
         )}
       </div>

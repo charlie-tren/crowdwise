@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BoardFilters, type Filters } from "./BoardFilters";
 import { BoardTable } from "./BoardTable";
 import { MarketCard } from "./MarketCard";
@@ -12,6 +12,16 @@ type Sort = "volume" | "probability" | "soonest";
 export function BoardView({ initial }: { initial: BoardPayload }) {
   const [view, setView] = useState<"cards" | "table">("cards");
   const [sort, setSort] = useState<Sort>("volume");
+  const [spark, setSpark] = useState<{ sparks: Record<string, number[]>; moves: Record<string, number> } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/sparklines")
+      .then((res) => res.json())
+      .then((data) => { if (!cancelled) setSpark(data); })
+      .catch(() => { /* sparklines are best-effort */ });
+    return () => { cancelled = true; };
+  }, []);
   const [filters, setFilters] = useState<Filters>({
     themes: new Set(CATEGORIES), platform: "All", search: "", probLo: 0, probHi: 100, headlineOnly: true,
   });
@@ -85,7 +95,14 @@ export function BoardView({ initial }: { initial: BoardPayload }) {
             </div>
             {view === "cards" ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {members.map((m) => <MarketCard key={m.id} m={m} move={initial.moves[m.id]} />)}
+                {members.map((m) => (
+                  <MarketCard
+                    key={m.id}
+                    m={m}
+                    move={spark?.moves[m.id] ?? initial.moves[m.id]}
+                    spark={spark?.sparks[m.id]}
+                  />
+                ))}
               </div>
             ) : (
               <BoardTable markets={members} moves={initial.moves} />
