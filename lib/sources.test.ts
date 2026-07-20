@@ -52,6 +52,22 @@ describe("fetchPolymarketMarkets (mocked seam)", () => {
     expect(out.length).toBe(1);
     expect(out[0].category).toBe("Inflation");
   });
+
+  it("merges macro-tag pulls with the volume pull and dedupes by id", async () => {
+    setHttpGetJson(async (_url, params) => {
+      if (params?.tag_id) {
+        // a low-volume Fed market only reachable via the macro tag, not top-volume
+        return [{ conditionId: "0xfed", question: "Will the Fed increase interest rates by 25 bps after the September 2026 meeting?", outcomePrices: '["0.1","0.9"]', volumeNum: 5, active: true }];
+      }
+      return [{ conditionId: "0xtop", question: "Will X win the 2028 election?", outcomePrices: '["0.5","0.5"]', volumeNum: 999, active: true }];
+    });
+    const out = await fetchPolymarketMarkets();
+    const ids = out.map((m) => m.id);
+    expect(ids).toContain("0xtop");
+    expect(ids).toContain("0xfed");
+    // returned by BOTH macro-tag calls but collapsed to one entry
+    expect(ids.filter((i) => i === "0xfed")).toHaveLength(1);
+  });
 });
 
 describe("fetchKalshiMarketHistory (mocked seam)", () => {

@@ -57,15 +57,45 @@ export async function fetchKalshiMarkets(
   return out;
 }
 
+// Curated Polymarket Gamma tag IDs for macro markets that sit BELOW the
+// top-by-volume cut (Fed decision buckets, recession) and so never surface in a
+// pure volume-sorted pull. Discovered via the /tags endpoint: "Economy" (100328)
+// carries the full US Fed decision set (no-change / ±25 / ±50 per meeting) plus
+// rate-cut-count markets; "recession" (100201) carries recession markets. Pulling
+// these is what gives the cross-venue matcher real overlap with Kalshi's macro
+// set instead of only the 2-3 highest-volume Fed markets.
+export const POLYMARKET_MACRO_TAGS = ["100328", "100201"];
+
+function polymarketItems(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object") return data.data ?? data.markets ?? [];
+  return [];
+}
+
 export async function fetchPolymarketMarkets(limit = 500): Promise<Market[]> {
-  const data = await _httpGetJson(`${POLYMARKET_BASE}/markets`, {
-    limit, active: "true", closed: "false", order: "volumeNum", ascending: "false",
+  const base = { active: "true", closed: "false", order: "volumeNum", ascending: "false" };
+  const calls: Array<Promise<any>> = [
+    _httpGetJson(`${POLYMARKET_BASE}/markets`, { ...base, limit }),
+    ...POLYMARKET_MACRO_TAGS.map((tag_id) =>
+      _httpGetJson(`${POLYMARKET_BASE}/markets`, { ...base, tag_id, limit: 100 }),
+    ),
+  ];
+  const results = await Promise.allSettled(calls);
+  const seen = new Set<string>();
+  const out: Market[] = [];
+  results.forEach((res, i) => {
+    if (res.status !== "fulfilled") {
+      console.warn(`Polymarket pull (${i === 0 ? "volume" : `tag ${POLYMARKET_MACRO_TAGS[i - 1]}`}) failed`, res.reason);
+      return;
+    }
+    for (const raw of polymarketItems(res.value)) {
+      const m = normalisePolymarketMarket(raw);
+      if (!m.id || seen.has(m.id)) continue;
+      seen.add(m.id);
+      out.push(m);
+    }
   });
-  let items: any[];
-  if (Array.isArray(data)) items = data;
-  else if (data && typeof data === "object") items = data.data ?? data.markets ?? [];
-  else items = [];
-  return items.map((m) => normalisePolymarketMarket(m));
+  return out;
 }
 
 export async function fetchKalshiMarketHistory(
