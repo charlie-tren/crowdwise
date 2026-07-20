@@ -39,15 +39,20 @@ export async function GET(req: Request) {
       });
     }
 
-    // Default: dump tags, flag the macro-looking ones.
-    const data = await j(`${GAMMA}/tags?limit=500`);
-    const items: any[] = Array.isArray(data) ? data : data?.data ?? data?.tags ?? [];
-    const tags = items.map((t) => ({ id: t.id, label: t.label, slug: t.slug }));
-    const macro = tags.filter((t) => MACRO_KW.test(`${t.label ?? ""} ${t.slug ?? ""}`));
+    // Default: paginate all tags, flag the macro-looking ones.
+    const all: Array<{ id: string; label: string; slug: string }> = [];
+    for (let offset = 0; offset < 2000; offset += 100) {
+      const data = await j(`${GAMMA}/tags?limit=100&offset=${offset}`);
+      const items: any[] = Array.isArray(data) ? data : data?.data ?? data?.tags ?? [];
+      if (!items.length) break;
+      all.push(...items.map((t) => ({ id: t.id, label: t.label, slug: t.slug })));
+      if (items.length < 100) break;
+    }
+    const macro = all.filter((t) => MACRO_KW.test(`${t.label ?? ""} ${t.slug ?? ""}`));
     return NextResponse.json({
-      totalTags: tags.length,
-      rawFirst: items[0] ?? null,
+      totalTags: all.length,
       macroTags: macro,
+      allLabels: all.map((t) => `${t.id}:${t.label}`),
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
