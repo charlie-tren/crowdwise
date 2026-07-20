@@ -80,7 +80,10 @@ export function parseStrike(m: Market): StrikeMarket | null {
 // Build one ladder per (metric, period, direction) family that has at least
 // `minRungs` distinct thresholds. Rungs are sorted by threshold; each is flagged
 // if it breaks monotonicity relative to the adjacent lower rung.
-export function buildStrikeLadders(markets: Market[], minRungs = 3, eps = 0.01): StrikeLadder[] {
+// eps = 3pp: below this, an adjacent inversion is within typical bid-ask /
+// rounding / staleness noise on fine-grained (0.1%-apart) ladders and would cry
+// wolf. Validated on live data - only inversions >=3pp are materially real.
+export function buildStrikeLadders(markets: Market[], minRungs = 3, eps = 0.03): StrikeLadder[] {
   const strikes = markets.map(parseStrike).filter((s): s is StrikeMarket => s != null);
 
   const groups = new Map<string, StrikeMarket[]>();

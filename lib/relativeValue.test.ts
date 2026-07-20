@@ -59,6 +59,12 @@ describe("buildStrikeLadders", () => {
     expect(bad!.violation).toBe(true);
   });
 
+  it("does not flag a sub-3pp inversion (within noise)", () => {
+    // 3.5% priced 2pp richer than 3.0% - a technical inversion, but within noise
+    const ladders = buildStrikeLadders([cpi(3.0, 0.40), cpi(3.5, 0.42), cpi(4.0, 0.20)]);
+    expect(ladders[0].hasViolation).toBe(false);
+  });
+
   it("ignores families with fewer than minRungs thresholds", () => {
     expect(buildStrikeLadders([cpi(3.0, 0.6), cpi(3.5, 0.4)])).toHaveLength(0);
   });
