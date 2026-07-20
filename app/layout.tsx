@@ -4,8 +4,8 @@ import { Nav } from "@/components/Nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Macro Signals",
-  description: "Live prediction-market probabilities across macro themes (Kalshi + Polymarket).",
+  title: "Crowdwise",
+  description: "The crowd's odds on macro events - live from Kalshi and Polymarket prediction markets.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

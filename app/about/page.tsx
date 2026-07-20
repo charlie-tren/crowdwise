@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { KALSHI_MACRO_SERIES } from "@/lib/taxonomy";
 
-export const metadata: Metadata = { title: "About · Macro Signals" };
+export const metadata: Metadata = { title: "About · Crowdwise" };
 
 export default function AboutPage() {
   const series = Object.entries(KALSHI_MACRO_SERIES).sort((a, b) => (a[1] + a[0]).localeCompare(b[1] + b[0]));
@@ -9,7 +9,7 @@ export default function AboutPage() {
     <article className="max-w-none">
       <h1 className="text-[28px] font-semibold tracking-[-0.02em]">About</h1>
       <p className="mt-2 text-sm text-muted">
-        Macro Signals shows live prediction-market probabilities across macro themes, pulled from the
+        Crowdwise shows live prediction-market probabilities across macro themes, pulled from the
         Kalshi and Polymarket public APIs and refreshed about every 10 minutes.
       </p>
       <h2 className="mt-6 text-lg font-semibold">Data sources</h2>

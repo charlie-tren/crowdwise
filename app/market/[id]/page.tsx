@@ -10,8 +10,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const id = decodeURIComponent(rawId);
   const markets = await fetchTopMarkets();
   const m = markets.find((x) => x.id === id);
-  if (!m) return { title: "Market · Macro Signals" };
-  return { title: `${m.title.slice(0, 60)} · Macro Signals` };
+  if (!m) return { title: "Market · Crowdwise" };
+  return { title: `${m.title.slice(0, 60)} · Crowdwise` };
 }
 
 export default async function MarketPage({ params }: { params: Promise<{ id: string }> }) {

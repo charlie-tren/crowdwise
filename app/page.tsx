@@ -17,9 +17,9 @@ export default async function HomePage() {
   const board = await getBoard();
   return (
     <>
-      <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Macro Signals</h1>
+      <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Crowdwise</h1>
       <p className="mb-6 text-sm text-muted">
-        Live prediction-market probabilities across macro themes, from the Kalshi &amp; Polymarket public APIs.
+        The crowd&apos;s odds on macro events - live implied probabilities from the Kalshi and Polymarket prediction markets.
       </p>
       {board.markets.length === 0 ? (
         <p className="text-muted">No live markets right now - check back shortly.</p>

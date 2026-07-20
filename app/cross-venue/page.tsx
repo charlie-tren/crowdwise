@@ -5,7 +5,7 @@ import { findCrossVenue } from "@/lib/crossVenue";
 
 export const revalidate = 300;
 export const maxDuration = 60;
-export const metadata: Metadata = { title: "Cross-Venue Prices · Macro Signals" };
+export const metadata: Metadata = { title: "Cross-Venue Prices · Crowdwise" };
 
 export default async function CrossVenuePage() {
   const markets = await fetchTopMarkets();

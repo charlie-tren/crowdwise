@@ -18,12 +18,15 @@ export function Nav() {
         href="/"
         className="flex items-center gap-2 text-[17px] font-semibold tracking-[-0.01em] text-[var(--text)]"
       >
-        <svg width="18" height="18" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <rect x="0" y="8" width="3" height="6" rx="0.5" fill="#4c9be8" />
-          <rect x="5.5" y="4" width="3" height="10" rx="0.5" fill="#4c9be8" />
-          <rect x="11" y="0" width="3" height="14" rx="0.5" fill="#4c9be8" />
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="10" cy="10" r="8.2" stroke="#2f5a86" strokeWidth="1" />
+          <circle cx="10" cy="10" r="4.6" stroke="#2f5a86" strokeWidth="0.9" />
+          <path d="M10 10 L15.8 4.2 A8.2 8.2 0 0 1 18.2 8.4 Z" fill="#4c9be8" fillOpacity="0.28" />
+          <line x1="10" y1="10" x2="15.8" y2="4.2" stroke="#4c9be8" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="13.5" cy="5.2" r="1.6" fill="#fbbf24" />
+          <circle cx="10" cy="10" r="1.4" fill="#4c9be8" />
         </svg>
-        Macro Signals
+        Crowdwise
       </Link>
       {LINKS.map(({ href, label }) => {
         const active = pathname?.startsWith(href);
