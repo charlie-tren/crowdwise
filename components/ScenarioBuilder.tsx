@@ -67,11 +67,13 @@ export function ScenarioBuilder({ markets }: { markets: Market[] }) {
             label="P(all resolve YES)"
             value={joint}
             hint={`All ${legs.length} legs resolve YES together`}
+            colour="#4c9be8"
           />
           <StatTile
             label="P(at least one)"
             value={atLeast}
             hint={`One or more of the ${legs.length} legs resolves YES`}
+            colour="#8ea2ff"
           />
         </div>
       ) : (
@@ -195,15 +197,15 @@ export function ScenarioBuilder({ markets }: { markets: Market[] }) {
   );
 }
 
-function StatTile({ label, value, hint }: { label: string; value: number; hint: string }) {
+function StatTile({ label, value, hint, colour }: { label: string; value: number; hint: string; colour: string }) {
   return (
     <div className="rounded-xl border border-white/[0.06] bg-panel/60 p-4">
       <div className="text-[13px] text-muted">{label}</div>
-      <div className="mt-1 text-4xl font-semibold tabular-nums tracking-[-0.02em] text-accent">{pct(value)}</div>
+      <div className="mt-1 text-4xl font-semibold tabular-nums tracking-[-0.02em]" style={{ color: colour }}>{pct(value)}</div>
       <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10" aria-hidden>
         <span
           className="block h-full rounded-full"
-          style={{ width: `${Math.max(1, Math.round(value * 100))}%`, background: probFill(value) }}
+          style={{ width: `${Math.max(1, Math.round(value * 100))}%`, background: colour }}
         />
       </div>
       <div className="mt-2 text-[11px] text-muted">{hint}</div>

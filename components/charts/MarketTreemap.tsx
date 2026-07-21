@@ -23,8 +23,6 @@ interface PlacedTile {
 interface PlacedHeader {
   theme: string;
   colour: string;
-  count: number;
-  volume: number;
   x: number;
   y: number;
   w: number;
@@ -58,15 +56,7 @@ function buildLayout(data: TreemapNode[]) {
 
     if (showHeader) {
       const r = round({ x: box.x, y: box.y, w: box.w, h: headerH });
-      headers.push({
-        theme: node.name,
-        colour,
-        count: node.children.length,
-        volume: node.children.reduce((a, c) => a + c.size, 0),
-        x: r.x,
-        y: r.y,
-        w: r.w,
-      });
+      headers.push({ theme: node.name, colour, x: r.x, y: r.y, w: r.w });
     }
 
     const tilesRect: Rect = { x: box.x, y: box.y + headerH, w: box.w, h: box.h - headerH };
@@ -161,19 +151,6 @@ export function MarketTreemap({ data }: { data: TreemapNode[] }) {
               >
                 {h.theme}
               </text>
-              {h.w > 190 && (
-                <text
-                  x={h.x + h.w - 10}
-                  y={h.y + HEADER_H / 2 + 1}
-                  dominantBaseline="middle"
-                  textAnchor="end"
-                  fontSize={11}
-                  fontWeight={500}
-                  fill="#7f8a9c"
-                >
-                  {h.count} · {fmtVol(h.volume)}
-                </text>
-              )}
             </g>
           ))}
 
