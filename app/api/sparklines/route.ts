@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchTopMarkets } from "@/lib/board";
+import { fetchTopMarkets, representativeByEvent } from "@/lib/board";
 import { buildSparklines } from "@/lib/sparklines";
 import { fetchKalshiMarketHistory } from "@/lib/sources";
 
@@ -10,8 +10,10 @@ export const revalidate = 600;
 export async function GET() {
   try {
     const markets = await fetchTopMarkets();
+    // Fetch history for the SAME representatives the board shows by default
+    // (representativeByEvent), so the returned ids match the rendered card ids.
     const data = await buildSparklines(
-      markets,
+      representativeByEvent(markets),
       (s, t) => fetchKalshiMarketHistory(s, t, { days: 7, periodInterval: 60 }),
       { maxMarkets: 40 },
     );
