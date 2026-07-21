@@ -17,7 +17,7 @@ async function realHttpGetJson(url: string, params: Record<string, string | numb
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const resp = await fetch(full, {
-      headers: { Accept: "application/json", "User-Agent": "macro-signals-web/1.0" },
+      headers: { Accept: "application/json", "User-Agent": "crowdwise/1.0" },
       signal: ctrl.signal,
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

@@ -1,6 +1,6 @@
 {
-  "name": "macro-signals-web",
-  "version": "0.3.0",
+  "name": "crowdwise",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
