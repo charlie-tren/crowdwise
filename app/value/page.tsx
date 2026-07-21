@@ -1,16 +1,57 @@
 import type { Metadata } from "next";
 import { StrikeLadders } from "@/components/StrikeLadders";
+import { DistributionCurve } from "@/components/charts/DistributionCurve";
 import { fetchTopMarkets } from "@/lib/board";
 import { buildStrikeLadders } from "@/lib/relativeValue";
+import { ladderToDistribution, probsToDistribution, type Distribution } from "@/lib/distribution";
+import { fetchKalshiMarketHistory } from "@/lib/sources";
 
 export const revalidate = 300;
 export const maxDuration = 60;
 export const metadata: Metadata = { title: "Relative value · Crowdwise" };
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function periodLabel(period: string): string {
+  const [y, mo] = period.split("-");
+  return mo ? `${MONTHS[Number(mo) - 1] ?? mo} ${y}` : y;
+}
+
 export default async function ValuePage() {
   const markets = await fetchTopMarkets();
   const ladders = buildStrikeLadders(markets);
   const flagged = ladders.filter((l) => l.hasViolation).length;
+
+  // Highest-volume CPI family ladder -> the implied distribution we feature.
+  const cpiLadder = ladders
+    .filter((l) => l.metric === "CPI inflation")
+    .sort((a, b) => b.volume - a.volume)[0];
+
+  let current: Distribution | null = null;
+  let ghost: Distribution | null = null;
+
+  if (cpiLadder) {
+    current = ladderToDistribution(cpiLadder);
+
+    // 7-day ghost: take each rung's OLDEST candlestick point (~7d ago) and
+    // rebuild the past distribution. Bounded by Promise.allSettled; a failed or
+    // empty fetch on any rung drops the ghost (a partial distribution would
+    // misrepresent the drift). Kalshi may 429 under load - handled gracefully.
+    const results = await Promise.allSettled(
+      cpiLadder.rungs.map((r) =>
+        fetchKalshiMarketHistory(r.series, r.id, { days: 7, periodInterval: 60 }),
+      ),
+    );
+    const past = cpiLadder.rungs.map((r, i) => {
+      const res = results[i];
+      if (res.status === "fulfilled" && res.value.length > 0) {
+        return { threshold: r.threshold, prob: res.value[0][1] }; // oldest point
+      }
+      return null;
+    });
+    if (past.every((p): p is { threshold: number; prob: number } => p != null)) {
+      ghost = probsToDistribution(past, cpiLadder.direction, cpiLadder.metric, cpiLadder.period);
+    }
+  }
 
   return (
     <div>
@@ -26,6 +67,22 @@ export default async function ValuePage() {
           : "No inconsistencies right now - every ladder is internally consistent."}
         {" "}For information only - not financial advice.
       </p>
+
+      {current && (
+        <section className="mb-8 rounded-2xl border border-white/[0.06] bg-panel/60 p-5">
+          <div className="mb-3">
+            <h2 className="text-[15px] font-semibold text-[var(--text)]">
+              Implied distribution - {current.metric}, {periodLabel(current.period)}
+            </h2>
+            <p className="text-[12px] text-muted">
+              The featured CPI ladder&apos;s strikes turned into a probability histogram: where the market thinks the
+              print lands.
+            </p>
+          </div>
+          <DistributionCurve current={current} ghost={ghost} />
+        </section>
+      )}
+
       <StrikeLadders ladders={ladders} />
     </div>
   );

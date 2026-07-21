@@ -21,7 +21,8 @@ export interface StrikeMarket {
 export interface LadderRung {
   threshold: number;
   prob: number;
-  id: string;
+  id: string; // Kalshi market ticker
+  series: string; // Kalshi series ticker - needed to fetch this rung's candlestick history
   title: string;
   violation: boolean; // breaks monotonicity vs the adjacent lower threshold
 }
@@ -114,7 +115,7 @@ export function buildStrikeLadders(markets: Market[], minRungs = 3, eps = 0.03):
         violation = direction === "above" ? s.prob - prev.prob > eps : prev.prob - s.prob > eps;
       }
       if (violation) hasViolation = true;
-      return { threshold: s.threshold, prob: s.prob, id: s.market.id, title: s.market.title, violation };
+      return { threshold: s.threshold, prob: s.prob, id: s.market.id, series: s.market.series, title: s.market.title, violation };
     });
 
     ladders.push({

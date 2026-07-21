@@ -125,6 +125,34 @@ export function fedDistribution(markets: Market[], todayYm?: string): FedDistrib
   return { ym, outcomes, total };
 }
 
+// ---- Fed meeting grid (per-meeting outcome distributions) ------------------
+
+export interface FedMeeting {
+  ym: string;
+  label: string; // short "Sep 2026"
+  outcomes: FedOutcome[];
+  total: number;
+}
+
+// Outcome distribution for each of the next `maxMeetings` FOMC meetings, for a
+// grid of per-meeting stacked bars. Only meetings with >=2 priced outcomes.
+export function fedMeetingGrid(markets: Market[], todayYm?: string, maxMeetings = 6): FedMeeting[] {
+  const fedMarkets = parseFedMarkets(markets);
+  if (!fedMarkets.length) return [];
+  const yms = [...new Set(fedMarkets.map((x) => x.fed.ym))]
+    .filter((ym) => (todayYm ? ym >= todayYm : true))
+    .sort()
+    .slice(0, maxMeetings);
+  const out: FedMeeting[] = [];
+  for (const ym of yms) {
+    const outcomes = meetingOutcomes(fedMarkets, ym);
+    if (outcomes.length < 2) continue;
+    const total = outcomes.reduce((s, o) => s + o.prob, 0);
+    out.push({ ym, label: shortLabel(ym), outcomes, total });
+  }
+  return out;
+}
+
 // ---- Fed implied path ------------------------------------------------------
 
 export interface FedPathPoint {

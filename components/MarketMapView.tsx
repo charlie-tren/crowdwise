@@ -4,7 +4,8 @@ import { representativeByEvent } from "@/lib/board";
 import { buildTreemap, buildScatter } from "@/lib/mapData";
 import { MarketTreemap } from "./charts/MarketTreemap";
 import { ConvictionScatter } from "./charts/ConvictionScatter";
-import { TopMovers, type MoverBar } from "./charts/TopMovers";
+import { MoversSlope, type MoverBar, type SlopeMover } from "./charts/MoversSlope";
+import { UncertaintyGauge } from "./UncertaintyGauge";
 import type { Market } from "@/lib/types";
 
 const TREEMAP_LIMIT = 45;
@@ -14,6 +15,21 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
   const treemapData = useMemo(() => buildTreemap(reps, TREEMAP_LIMIT), [reps]);
   const scatterData = useMemo(() => buildScatter(reps), [reps]);
   const [movers, setMovers] = useState<MoverBar[] | null>(null);
+
+  // Current implied prob per market id, so each mover's "now" comes from the live board
+  // (was = now - move).
+  const probById = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const m of markets) map.set(m.id, m.prob);
+    return map;
+  }, [markets]);
+
+  const slopeMovers = useMemo<SlopeMover[] | null>(() => {
+    if (movers === null) return null;
+    return movers
+      .map((mv) => ({ ...mv, now: probById.get(mv.id) ?? null }))
+      .filter((mv): mv is SlopeMover => mv.now !== null);
+  }, [movers, probById]);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,6 +57,8 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
         crowd is genuinely undecided.
       </p>
 
+      <UncertaintyGauge markets={markets} />
+
       <h2 className="mb-1 text-lg font-medium">Biggest markets by volume</h2>
       <p className="mb-3 text-sm text-muted">
         The largest markets by volume (top {TREEMAP_LIMIT}), grouped by theme. Larger tiles trade more; brighter tiles
@@ -63,10 +81,10 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
       <p className="mb-2 text-sm text-muted">
         Biggest probability moves over the past week, from Kalshi price history.
       </p>
-      {movers === null ? (
+      {slopeMovers === null ? (
         <p className="text-sm text-muted">Loading movers...</p>
       ) : (
-        <TopMovers movers={movers} />
+        <MoversSlope movers={slopeMovers} />
       )}
     </div>
   );

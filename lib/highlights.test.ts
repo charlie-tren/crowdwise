@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headlineOdds, fedDistribution, fedPath } from "./highlights";
+import { headlineOdds, fedDistribution, fedPath, fedMeetingGrid } from "./highlights";
 import type { Market } from "./types";
 
 let seq = 0;
@@ -158,5 +158,36 @@ describe("fedPath", () => {
       "2026-08",
     );
     expect(path.map((p) => p.ym)).toEqual(["2026-12"]);
+  });
+});
+
+describe("fedMeetingGrid", () => {
+  const mk = (title: string, prob: number, ym: string) =>
+    m({ platform: "Kalshi", title, prob, volume: 1000, endDate: `${ym}-16` });
+
+  it("returns per-meeting outcome distributions for upcoming meetings only", () => {
+    const grid = fedMeetingGrid(
+      [
+        mk("Will the Fed Cut rates by 25bps at their September 2026 meeting?", 0.5, "2026-09"),
+        mk("Will the Fed Hike rates by 0bps at their September 2026 meeting?", 0.5, "2026-09"),
+        mk("Will the Fed Cut rates by 25bps at their December 2026 meeting?", 0.6, "2026-12"),
+        mk("Will the Fed Hike rates by 0bps at their December 2026 meeting?", 0.4, "2026-12"),
+        mk("Will the Fed Cut rates by 25bps at their June 2026 meeting?", 0.9, "2026-06"), // past
+        mk("Will the Fed Hike rates by 0bps at their June 2026 meeting?", 0.1, "2026-06"),
+      ],
+      "2026-08",
+    );
+    expect(grid.map((g) => g.ym)).toEqual(["2026-09", "2026-12"]);
+    expect(grid[0].label).toBe("Sep 2026");
+    expect(grid[0].outcomes.map((o) => o.label)).toEqual(["Cut 25", "Hold"]);
+    expect(grid[0].total).toBeCloseTo(1.0, 5);
+  });
+
+  it("skips meetings with a single priced outcome", () => {
+    const grid = fedMeetingGrid(
+      [mk("Will the Fed Cut rates by 25bps at their September 2026 meeting?", 0.5, "2026-09")],
+      "2026-01",
+    );
+    expect(grid).toHaveLength(0);
   });
 });

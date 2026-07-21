@@ -1,9 +1,14 @@
 import { BoardView } from "@/components/BoardView";
 import { HeadlineOdds } from "@/components/HeadlineOdds";
+import { EventCalendar } from "@/components/EventCalendar";
 import { FedDistributionBar, meetingLabel } from "@/components/charts/FedDistributionBar";
 import { FedPathChart } from "@/components/charts/FedPathChart";
+import { FedPathGrid } from "@/components/charts/FedPathGrid";
 import { fetchTopMarkets } from "@/lib/board";
-import { headlineOdds, fedDistribution, fedPath } from "@/lib/highlights";
+import { headlineOdds, fedDistribution, fedPath, fedMeetingGrid } from "@/lib/highlights";
+import { buildEventCalendar } from "@/lib/calendar";
+import { buildSparklines } from "@/lib/sparklines";
+import { fetchKalshiMarketHistory } from "@/lib/sources";
 import type { BoardPayload } from "@/lib/types";
 
 // ISR: the rendered board is cached and regenerated at most every 5 minutes, so
@@ -22,8 +27,19 @@ export default async function HomePage() {
   const tiles = headlineOdds(board.markets);
   const now = new Date();
   const todayYm = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const todayISO = now.toISOString().slice(0, 10);
   const fed = fedDistribution(board.markets, todayYm);
   const path = fedPath(board.markets, todayYm);
+  const grid = fedMeetingGrid(board.markets, todayYm);
+  const events = buildEventCalendar(board.markets, todayISO);
+
+  // 7-day trend for the headline tiles (bounded: only the ~4 tile markets).
+  const tileIds = new Set(tiles.map((t) => t.id));
+  const tileMarkets = board.markets.filter((m) => tileIds.has(m.id));
+  const tileHist = await buildSparklines(
+    tileMarkets,
+    (s, t) => fetchKalshiMarketHistory(s, t, { days: 7, periodInterval: 60 }),
+  );
 
   return (
     <>
@@ -36,7 +52,7 @@ export default async function HomePage() {
         <p className="text-muted">No live markets right now - check back shortly.</p>
       ) : (
         <>
-          <HeadlineOdds tiles={tiles} />
+          <HeadlineOdds tiles={tiles} moves={tileHist.moves} sparks={tileHist.sparks} />
 
           {fed && (
             <section className="mb-8">
@@ -56,6 +72,26 @@ export default async function HomePage() {
                 easing is priced in.
               </p>
               <FedPathChart points={path} />
+            </section>
+          )}
+
+          {grid.length >= 2 && (
+            <section className="mb-8">
+              <h2 className="mb-1 text-lg font-medium">Outcome by meeting</h2>
+              <p className="mb-3 text-sm text-muted">
+                The full outcome distribution priced for each upcoming FOMC meeting.
+              </p>
+              <FedPathGrid meetings={grid} />
+            </section>
+          )}
+
+          {events.length > 0 && (
+            <section className="mb-10">
+              <h2 className="mb-1 text-lg font-medium">Upcoming resolutions</h2>
+              <p className="mb-3 text-sm text-muted">
+                When the biggest markets settle - the macro calendar the crowd is watching.
+              </p>
+              <EventCalendar events={events} />
             </section>
           )}
 

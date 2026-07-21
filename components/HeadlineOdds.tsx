@@ -1,15 +1,29 @@
 import Link from "next/link";
 import { pct, fmtVol } from "@/lib/format";
 import { THEME_COLOURS } from "@/lib/themeColours";
+import { Sparkline } from "./charts/Sparkline";
 import type { HeadlineTile } from "@/lib/highlights";
 
-// Big, shareable "market-implied odds" tiles - the home-page hero. The number
-// stays neutral white (magnitude, not sentiment); the theme carries the colour.
-export function HeadlineOdds({ tiles }: { tiles: HeadlineTile[] }) {
+// Big, shareable "market-implied odds" tiles - the home-page hero / scorecard.
+// The number stays neutral white (magnitude, not sentiment); the theme carries
+// the colour; the optional 7d move + sparkline give at-a-glance trend.
+export function HeadlineOdds({
+  tiles,
+  moves,
+  sparks,
+}: {
+  tiles: HeadlineTile[];
+  moves?: Record<string, number>;
+  sparks?: Record<string, number[]>;
+}) {
   if (!tiles.length) return null;
   return (
     <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {tiles.map((t) => (
+      {tiles.map((t) => {
+        const move = moves?.[t.id];
+        const spark = sparks?.[t.id];
+        const showMove = move != null && Math.abs(move) >= 0.001;
+        return (
         <Link
           key={t.id}
           href={`/market/${encodeURIComponent(t.id)}`}
@@ -28,11 +42,22 @@ export function HeadlineOdds({ tiles }: { tiles: HeadlineTile[] }) {
           <div className="mt-2 line-clamp-2 text-[13px] leading-snug text-muted group-hover:text-[var(--text)]">
             {t.title}
           </div>
-          <div className="mt-2 text-[11px] text-[var(--muted-dim)]">
-            {t.platform} · vol {fmtVol(t.volume)}
+          <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-[var(--muted-dim)]">
+            <span>{t.platform} · vol {fmtVol(t.volume)}</span>
+            {(spark || showMove) && (
+              <span className="flex items-center gap-1.5">
+                {spark && spark.length >= 2 && <Sparkline values={spark} width={44} height={14} />}
+                {showMove && (
+                  <span className="tabular-nums" style={{ color: (move as number) >= 0 ? "#3fb27f" : "#e0714f" }}>
+                    {(move as number) >= 0 ? "▲" : "▼"} {Math.abs((move as number) * 100).toFixed(1)}
+                  </span>
+                )}
+              </span>
+            )}
           </div>
         </Link>
-      ))}
+        );
+      })}
     </div>
   );
 }
