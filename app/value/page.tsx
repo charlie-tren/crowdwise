@@ -21,10 +21,14 @@ export default async function ValuePage() {
   const ladders = buildStrikeLadders(markets);
   const flagged = ladders.filter((l) => l.hasViolation).length;
 
-  // Highest-volume CPI family ladder -> the implied distribution we feature.
-  const cpiLadder = ladders
+  // Feature a CPI family for the implied distribution. Prefer the highest-volume
+  // KALSHI-backed family (its rungs carry a `series`, so we can fetch candlestick
+  // history and render the 7d ghost); fall back to the overall highest-volume CPI
+  // family (e.g. a Polymarket annual one, which has no history -> no ghost).
+  const cpiLadders = ladders
     .filter((l) => l.metric === "CPI inflation")
-    .sort((a, b) => b.volume - a.volume)[0];
+    .sort((a, b) => b.volume - a.volume);
+  const cpiLadder = cpiLadders.find((l) => l.rungs.every((r) => r.series)) ?? cpiLadders[0];
 
   let current: Distribution | null = null;
   let ghost: Distribution | null = null;
