@@ -31,15 +31,17 @@ export function FedPathGrid({ meetings }: { meetings: FedMeeting[] }) {
             <div key={mtg.ym} className="flex min-w-[64px] flex-1 flex-col items-center gap-2">
               <div className="flex h-36 w-full flex-col overflow-hidden rounded-lg border border-white/[0.06]">
                 {stacked.map((o) => {
+                  // Height normalised to fill the column; label is the raw market
+                  // price, consistent with the distribution bar and the tile.
                   const h = (o.prob / denom) * 100;
                   return (
                     <div
                       key={o.id}
-                      title={`${mtg.label} · ${o.label}: ${(o.prob / denom * 100).toFixed(0)}%`}
+                      title={`${mtg.label} · ${o.label}: ${(o.prob * 100).toFixed(0)}%`}
                       className="flex items-center justify-center overflow-hidden text-[10px] font-semibold text-[#0b0e17]"
                       style={{ height: `${h}%`, background: segmentColour(o) }}
                     >
-                      {h >= 16 && <span className="tabular-nums">{(o.prob / denom * 100).toFixed(0)}</span>}
+                      {h >= 16 && <span className="tabular-nums">{(o.prob * 100).toFixed(0)}</span>}
                     </div>
                   );
                 })}

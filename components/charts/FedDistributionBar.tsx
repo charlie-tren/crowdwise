@@ -30,6 +30,9 @@ export function FedDistributionBar({ dist }: { dist: FedDistribution }) {
         className="flex h-11 w-full overflow-hidden rounded-lg border border-white/[0.06]"
       >
         {dist.outcomes.map((o) => {
+          // Width is normalised so the segments fill the bar (a clean 100% visual),
+          // but the LABEL is the raw market price - the same number the scorecard
+          // tile and the market's own page show, so nothing contradicts on click-through.
           const w = (o.prob / denom) * 100;
           const wide = w >= 9;
           return (
@@ -40,7 +43,7 @@ export function FedDistributionBar({ dist }: { dist: FedDistribution }) {
               className="flex items-center justify-center overflow-hidden text-[12px] font-semibold text-[#0b0e17] transition-opacity hover:opacity-90"
               style={{ width: `${w}%`, background: segmentColour(o) }}
             >
-              {wide && <span className="truncate px-1 tabular-nums">{(o.prob / denom * 100).toFixed(0)}%</span>}
+              {wide && <span className="truncate px-1 tabular-nums">{(o.prob * 100).toFixed(0)}%</span>}
             </Link>
           );
         })}
@@ -50,10 +53,13 @@ export function FedDistributionBar({ dist }: { dist: FedDistribution }) {
           <span key={o.id} className="flex items-center gap-1.5">
             <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: segmentColour(o) }} />
             {o.label}
-            <span className="tabular-nums text-[var(--text)]">{(o.prob / denom * 100).toFixed(0)}%</span>
+            <span className="tabular-nums text-[var(--text)]">{(o.prob * 100).toFixed(0)}%</span>
           </span>
         ))}
       </div>
+      <p className="mt-2 text-[11px] text-[var(--muted-dim)]">
+        Each outcome is a separate market; live prices sum to {(dist.total * 100).toFixed(0)}%, not exactly 100%.
+      </p>
     </div>
   );
 }
