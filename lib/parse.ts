@@ -36,6 +36,22 @@ export function firstOutcomePrice(raw: unknown): number | null {
   return null;
 }
 
+// Polymarket's Gamma API returns clobTokenIds as a JSON-stringified 2-element
+// array [yesTokenId, noTokenId]. The first element is the YES-outcome token, which
+// aligns with firstOutcomePrice (the YES price). That token id - NOT the
+// conditionId - is what the CLOB /prices-history endpoint requires.
+export function firstClobTokenId(raw: unknown): string {
+  if (raw === null || raw === undefined) return "";
+  let val: unknown = raw;
+  try {
+    if (typeof val === "string") val = JSON.parse(val);
+    if (Array.isArray(val) && val.length > 0 && val[0] != null) return String(val[0]);
+  } catch {
+    return "";
+  }
+  return "";
+}
+
 export function kalshiProb(raw: Record<string, unknown>): number | null {
   const last = toFloat(raw.last_price_dollars, 0);
   if (last > 0) return clampProb(last);

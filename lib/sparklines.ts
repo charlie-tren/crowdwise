@@ -1,8 +1,10 @@
 import { historyMove } from "./history";
 import type { Market, HistoryPoint } from "./types";
 
-// Injected so tests don't hit the network (same seam as computeTopMovers).
-export type HistoryFetcher = (series: string, ticker: string) => Promise<HistoryPoint[]>;
+// Injected so tests don't hit the network (same seam as computeTopMovers). Takes
+// the whole Market so the caller can dispatch by platform (Kalshi candlesticks vs
+// Polymarket CLOB price history), which need different identifiers.
+export type HistoryFetcher = (market: Market) => Promise<HistoryPoint[]>;
 
 export interface SparkData {
   sparks: Record<string, number[]>; // id -> downsampled prob series (oldest-first)
@@ -17,10 +19,20 @@ function downsample(vals: number[], n: number): number[] {
   return out;
 }
 
-// Fetch 7d candlestick history for the top Kalshi markets by volume (BOUNDED to
-// maxMarkets so we never scan the whole board) and return a compact prob series
-// + net move per id for card sparklines. Best-effort: a failed fetch is skipped.
-// Polymarket has no candlestick history in our sources, so it is not covered.
+// True when a market has an identifier we can fetch price history for: a Kalshi
+// series+ticker (candlesticks) or a Polymarket CLOB token id (/prices-history).
+function hasHistorySource(m: Market): boolean {
+  if (!m.id) return false;
+  if (m.platform === "Kalshi") return Boolean(m.series);
+  if (m.platform === "Polymarket") return Boolean(m.clobTokenId);
+  return false;
+}
+
+// Fetch 7d price history for the top markets by volume (BOUNDED to maxMarkets so
+// we never scan the whole board) and return a compact prob series + net move per
+// id for card sparklines. Best-effort: a failed fetch is skipped. Covers both
+// Kalshi (candlesticks) and Polymarket (CLOB price history) via the injected
+// platform-dispatching fetcher; markets with no history source are excluded.
 export async function buildSparklines(
   markets: Market[],
   fetchHistory: HistoryFetcher,
@@ -28,12 +40,12 @@ export async function buildSparklines(
 ): Promise<SparkData> {
   const { maxMarkets = 40, points = 20, minPoints = 3 } = opts;
   const cands = markets
-    .filter((m) => m.platform === "Kalshi" && m.series && m.id)
+    .filter(hasHistorySource)
     .sort((a, b) => (b.volume || 0) - (a.volume || 0))
     .slice(0, maxMarkets);
 
   const results = await Promise.allSettled(
-    cands.map(async (m) => ({ id: m.id, pts: await fetchHistory(m.series, m.id) })),
+    cands.map(async (m) => ({ id: m.id, pts: await fetchHistory(m) })),
   );
 
   const sparks: Record<string, number[]> = {};

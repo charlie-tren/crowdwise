@@ -8,8 +8,8 @@ import { fetchTopMarkets } from "@/lib/board";
 import { headlineOdds, fedDistribution, fedPath, fedMeetingGrid } from "@/lib/highlights";
 import { buildEventCalendar } from "@/lib/calendar";
 import { buildSparklines } from "@/lib/sparklines";
-import { fetchKalshiMarketHistory } from "@/lib/sources";
-import type { BoardPayload } from "@/lib/types";
+import { fetchKalshiMarketHistory, fetchPolymarketMarketHistory } from "@/lib/sources";
+import type { BoardPayload, Market } from "@/lib/types";
 
 // ISR: the rendered board is cached and regenerated at most every 5 minutes, so
 // public traffic is served from cache rather than hitting the upstream APIs on
@@ -36,9 +36,10 @@ export default async function HomePage() {
   // 7-day trend for the headline tiles (bounded: only the ~4 tile markets).
   const tileIds = new Set(tiles.map((t) => t.id));
   const tileMarkets = board.markets.filter((m) => tileIds.has(m.id));
-  const tileHist = await buildSparklines(
-    tileMarkets,
-    (s, t) => fetchKalshiMarketHistory(s, t, { days: 7, periodInterval: 60 }),
+  const tileHist = await buildSparklines(tileMarkets, (m: Market) =>
+    m.platform === "Polymarket"
+      ? fetchPolymarketMarketHistory(m.clobTokenId ?? "", { days: 7, fidelity: 60 })
+      : fetchKalshiMarketHistory(m.series, m.id, { days: 7, periodInterval: 60 }),
   );
 
   return (

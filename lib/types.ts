@@ -11,6 +11,10 @@ export interface Market {
   status: string;
   series: string;
   event: string;
+  // Polymarket CLOB token id for the YES outcome (Gamma clobTokenIds[0]). Needed
+  // to fetch price history from the CLOB /prices-history endpoint - the conditionId
+  // in `id` does NOT work there. Absent for Kalshi.
+  clobTokenId?: string;
 }
 
 export type HistoryPoint = [string, number]; // [isoTs, prob]

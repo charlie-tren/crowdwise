@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
-  fetchKalshiMarkets, fetchPolymarketMarkets, fetchKalshiMarketHistory, setHttpGetJson, resetHttpGetJson,
+  fetchKalshiMarkets, fetchPolymarketMarkets, fetchKalshiMarketHistory,
+  fetchPolymarketMarketHistory, setHttpGetJson, resetHttpGetJson,
 } from "./sources";
 
 afterEach(() => resetHttpGetJson());
@@ -97,5 +98,43 @@ describe("fetchKalshiMarketHistory (mocked seam)", () => {
   it("empty on fetch returning null", async () => {
     setHttpGetJson(async () => null);
     expect(await fetchKalshiMarketHistory("KXFED", "KXFED-X", { nowTs: 1735800000 })).toEqual([]);
+  });
+});
+
+describe("fetchPolymarketMarketHistory (mocked seam)", () => {
+  it("parses {history:[{t,p}]} to iso/prob pairs oldest-first and passes the token as market", async () => {
+    let seenMarket: unknown;
+    setHttpGetJson(async (_url, params) => {
+      seenMarket = params!.market;
+      return { history: [
+        { t: 1735776000, p: 0.55 },
+        { t: 1735689600, p: 0.40 }, // out of order on purpose
+      ] };
+    });
+    const out = await fetchPolymarketMarketHistory("tok123", { days: 7, nowTs: 1735800000 });
+    expect(seenMarket).toBe("tok123");
+    expect(out.length).toBe(2);
+    expect(out[0][1]).toBeCloseTo(0.40); // sorted oldest-first
+    expect(out[1][1]).toBeCloseTo(0.55);
+    expect(out[0][0] < out[1][0]).toBe(true);
+  });
+  it("clamps out-of-range prices and drops non-finite points", async () => {
+    setHttpGetJson(async () => ({ history: [
+      { t: 1735689600, p: 1.4 },      // clamps to 1
+      { t: "bad", p: 0.5 },            // non-finite ts dropped
+      { t: 1735776000, p: "x" },       // non-finite price dropped
+    ] }));
+    const out = await fetchPolymarketMarketHistory("tok", { nowTs: 1735800000 });
+    expect(out).toEqual([["2025-01-01T00:00:00.000Z", 1]]);
+  });
+  it("empty on missing token id (no fetch)", async () => {
+    let called = false;
+    setHttpGetJson(async () => { called = true; return { history: [] }; });
+    expect(await fetchPolymarketMarketHistory("")).toEqual([]);
+    expect(called).toBe(false);
+  });
+  it("empty on fetch throwing", async () => {
+    setHttpGetJson(async () => { throw new Error("blocked"); });
+    expect(await fetchPolymarketMarketHistory("tok", { nowTs: 1735800000 })).toEqual([]);
   });
 });

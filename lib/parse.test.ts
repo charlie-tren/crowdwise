@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toFloat, isoDate, clampProb, firstOutcomePrice, kalshiProb, stripMarkdown } from "./parse";
+import { toFloat, isoDate, clampProb, firstOutcomePrice, firstClobTokenId, kalshiProb, stripMarkdown } from "./parse";
 
 describe("parse helpers", () => {
   it("stripMarkdown removes bold markers", () => {
@@ -23,6 +23,13 @@ describe("parse helpers", () => {
     expect(firstOutcomePrice(null)).toBeNull();
     expect(firstOutcomePrice("not json")).toBeNull();
     expect(firstOutcomePrice([])).toBeNull();
+  });
+  it("firstClobTokenId json string", () => expect(firstClobTokenId('["11111", "22222"]')).toBe("11111"));
+  it("firstClobTokenId list", () => expect(firstClobTokenId([333, 444])).toBe("333"));
+  it("firstClobTokenId bad/empty", () => {
+    expect(firstClobTokenId(null)).toBe("");
+    expect(firstClobTokenId("not json")).toBe("");
+    expect(firstClobTokenId([])).toBe("");
   });
   it("kalshiProb uses last price", () => expect(kalshiProb({ last_price_dollars: "0.47" })).toBeCloseTo(0.47));
   it("kalshiProb midpoint fallback", () =>

@@ -39,6 +39,7 @@ describe("normaliseKalshiMarket", () => {
 const polyRaw = (over: Record<string, unknown> = {}) => ({
   conditionId: "0xabc123", question: "Will there be a US recession in 2026?",
   outcomePrices: '["0.32", "0.68"]', volumeNum: 98765.4,
+  clobTokenIds: '["11111", "22222"]',
   endDate: "2026-12-31T00:00:00Z", active: true, closed: false, ...over,
 });
 
@@ -53,6 +54,11 @@ describe("normalisePolymarketMarket", () => {
     expect(r.endDate).toBe("2026-12-31");
     expect(r.status).toBe("active");
     expect(r.series).toBe("");
+    expect(r.clobTokenId).toBe("11111"); // YES token from clobTokenIds[0]
+  });
+  it("clobTokenId empty when clobTokenIds absent", () => {
+    const raw = polyRaw(); delete (raw as Record<string, unknown>).clobTokenIds;
+    expect(normalisePolymarketMarket(raw).clobTokenId).toBe("");
   });
   it("closed status", () =>
     expect(normalisePolymarketMarket(polyRaw({ active: false, closed: true })).status).toBe("closed"));

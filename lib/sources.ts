@@ -1,11 +1,12 @@
 import { normaliseKalshiMarket, normalisePolymarketMarket } from "./normalise";
 import { KALSHI_MACRO_SERIES } from "./taxonomy";
-import { candleProb } from "./parse";
+import { candleProb, clampProb } from "./parse";
 import type { Category } from "./taxonomy";
 import type { Market, HistoryPoint } from "./types";
 
 export const KALSHI_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 export const POLYMARKET_BASE = "https://gamma-api.polymarket.com";
+export const POLYMARKET_CLOB_BASE = "https://clob.polymarket.com";
 export const DEFAULT_TIMEOUT = 10_000;
 
 type HttpGetJson = (url: string, params?: Record<string, string | number>, timeoutMs?: number) => Promise<any>;
@@ -120,6 +121,42 @@ export async function fetchKalshiMarketHistory(
     const prob = candleProb(candle);
     if (ts === null || ts === undefined || prob === null) continue;
     const iso = new Date(Number(ts) * 1000).toISOString();
+    out.push([iso, prob]);
+  }
+  out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return out;
+}
+
+// Polymarket price history from the CLOB /prices-history endpoint. `tokenId` is
+// the YES-outcome CLOB token id (Market.clobTokenId from Gamma clobTokenIds[0]) -
+// the conditionId does NOT work here. Returns [iso, prob] pairs oldest-first.
+// Best-effort: empty on missing id, error, or empty history (mirrors the Kalshi
+// candlestick fetcher). fidelity is the bar width in minutes.
+export async function fetchPolymarketMarketHistory(
+  tokenId: string,
+  opts: { days?: number; fidelity?: number; nowTs?: number } = {},
+): Promise<HistoryPoint[]> {
+  if (!tokenId) return [];
+  const { days = 90, fidelity = 60, nowTs } = opts;
+  const end = Math.floor(nowTs ?? Date.now() / 1000);
+  const start = end - days * 24 * 3600;
+  let data: any;
+  try {
+    data = await _httpGetJson(
+      `${POLYMARKET_CLOB_BASE}/prices-history`,
+      { market: tokenId, startTs: start, endTs: end, fidelity },
+      8000,
+    );
+  } catch {
+    return [];
+  }
+  const out: HistoryPoint[] = [];
+  for (const point of data?.history ?? []) {
+    const ts = Number(point?.t);
+    const rawP = Number(point?.p);
+    if (!Number.isFinite(ts) || !Number.isFinite(rawP)) continue;
+    const prob = clampProb(rawP) as number; // finite -> never null
+    const iso = new Date(ts * 1000).toISOString();
     out.push([iso, prob]);
   }
   out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));

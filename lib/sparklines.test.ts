@@ -18,24 +18,39 @@ describe("buildSparklines", () => {
     const a = m({ id: "KX-A", volume: 900 });
     const b = m({ id: "KX-B", volume: 800 });
     const hist: Record<string, number[]> = { "KX-A": [0.2, 0.3, 0.5], "KX-B": [0.6, 0.55, 0.4] };
-    const out = await buildSparklines([a, b], async (_s, t) => pts(hist[t] ?? []));
+    const out = await buildSparklines([a, b], async (mkt) => pts(hist[mkt.id] ?? []));
     expect(out.sparks["KX-A"]).toEqual([0.2, 0.3, 0.5]);
     expect(out.moves["KX-A"]).toBeCloseTo(0.3, 5); // 0.5 - 0.2
     expect(out.moves["KX-B"]).toBeCloseTo(-0.2, 5);
   });
 
-  it("skips Polymarket and series with too few points", async () => {
+  it("covers a Polymarket market that carries a clobTokenId", async () => {
+    const p = m({ id: "0xposy", platform: "Polymarket", series: "", clobTokenId: "tok123", volume: 5000 });
+    const out = await buildSparklines([p], async (mkt) =>
+      pts(mkt.clobTokenId === "tok123" ? [0.4, 0.45, 0.6] : []),
+    );
+    expect(out.sparks["0xposy"]).toEqual([0.4, 0.45, 0.6]);
+    expect(out.moves["0xposy"]).toBeCloseTo(0.2, 5);
+  });
+
+  it("excludes a Polymarket market with no clobTokenId (no history source)", async () => {
+    const p = m({ id: "0xnotok", platform: "Polymarket", series: "", volume: 5000 });
+    let called = false;
+    const out = await buildSparklines([p], async () => { called = true; return pts([0.1, 0.2, 0.3]); });
+    expect(out.sparks["0xnotok"]).toBeUndefined();
+    expect(called).toBe(false); // never even fetched
+  });
+
+  it("skips a series with too few points", async () => {
     const k = m({ id: "KX-A", volume: 900 });
-    const p = m({ id: "0xposy", platform: "Polymarket", series: "", volume: 5000 });
-    const out = await buildSparklines([k, p], async (_s, t) => pts(t === "KX-A" ? [0.3] : [0.1, 0.2, 0.3]));
-    expect(out.sparks["0xposy"]).toBeUndefined(); // Polymarket excluded (no series)
-    expect(out.sparks["KX-A"]).toBeUndefined();   // only 1 point < minPoints
+    const out = await buildSparklines([k], async () => pts([0.3])); // 1 point < minPoints
+    expect(out.sparks["KX-A"]).toBeUndefined();
   });
 
   it("bounds the fetch to maxMarkets by volume", async () => {
     const markets = Array.from({ length: 5 }, (_, i) => m({ id: `KX-${i}`, volume: (i + 1) * 100 }));
     const fetched: string[] = [];
-    await buildSparklines(markets, async (_s, t) => { fetched.push(t); return pts([0.1, 0.2, 0.3]); }, { maxMarkets: 2 });
+    await buildSparklines(markets, async (mkt) => { fetched.push(mkt.id); return pts([0.1, 0.2, 0.3]); }, { maxMarkets: 2 });
     expect(fetched.length).toBe(2); // the two highest-volume only
   });
 

@@ -1,5 +1,5 @@
 import { categoriseMarket } from "./categorise";
-import { toFloat, isoDate, kalshiProb, firstOutcomePrice, stripMarkdown } from "./parse";
+import { toFloat, isoDate, kalshiProb, firstOutcomePrice, firstClobTokenId, stripMarkdown } from "./parse";
 import type { Category } from "./taxonomy";
 import type { Market } from "./types";
 
@@ -37,5 +37,6 @@ export function normalisePolymarketMarket(raw: Record<string, any>): Market {
     status,
     series: "",
     event: "",
+    clobTokenId: firstClobTokenId(raw.clobTokenIds),
   };
 }
