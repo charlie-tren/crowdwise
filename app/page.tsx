@@ -6,7 +6,7 @@ import { FedPathChart } from "@/components/charts/FedPathChart";
 import { FedPathGrid } from "@/components/charts/FedPathGrid";
 import { FedPathOverlay } from "@/components/charts/FedPathOverlay";
 import { fetchTopMarkets } from "@/lib/board";
-import { headlineOdds, fedDistribution, fedPath, fedMeetingGrid } from "@/lib/highlights";
+import { headlineOdds, fedHeadlineTile, fedDistribution, fedPath, fedMeetingGrid } from "@/lib/highlights";
 import { fetchFedFuturesPath, buildOverlaySeries } from "@/lib/fedFutures";
 import { buildEventCalendar } from "@/lib/calendar";
 import { buildSparklines } from "@/lib/sparklines";
@@ -31,6 +31,14 @@ export default async function HomePage() {
   const todayYm = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
   const todayISO = now.toISOString().slice(0, 10);
   const fed = fedDistribution(board.markets, todayYm);
+  // Keep the Rates/Fed tile consistent with the Fed distribution below it (both
+  // Kalshi-sourced) rather than an arbitrary highest-volume cross-venue market.
+  const fedTile = fedHeadlineTile(fed, board.markets);
+  if (fedTile) {
+    const i = tiles.findIndex((t) => t.category === "Rates/Fed");
+    if (i >= 0) tiles[i] = fedTile;
+    else tiles.unshift(fedTile);
+  }
   const path = fedPath(board.markets, todayYm);
   const grid = fedMeetingGrid(board.markets, todayYm);
   const events = buildEventCalendar(board.markets, todayISO);

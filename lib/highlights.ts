@@ -43,6 +43,27 @@ function fedTileTitle(fed: FedProposition): string {
   return `Fed ${verb} ${fed.bps}bps at the ${when} meeting`;
 }
 
+// The Rates/Fed headline tile, derived from the SAME Kalshi Fed distribution as
+// the on-page Fed viz (its most-likely / modal outcome). The generic headlineOdds
+// picks the highest-VOLUME Fed market across venues, which on some days is a
+// Polymarket market priced a couple of points away from Kalshi - so the tile could
+// show e.g. 75% while the distribution/path/grid below (all Kalshi-only) show 77%.
+// Sourcing the tile from the distribution guarantees they agree, and "most likely
+// outcome" is the natural headline anyway. Null if there is no Fed distribution.
+export function fedHeadlineTile(fed: FedDistribution | null, markets: Market[]): HeadlineTile | null {
+  if (!fed || !fed.outcomes.length) return null;
+  const modal = fed.outcomes.reduce((a, b) => (b.prob > a.prob ? b : a));
+  const mkt = markets.find((m) => m.id === modal.id);
+  return {
+    category: "Rates/Fed",
+    title: fedTileTitle({ ym: fed.ym, action: modal.action, bps: modal.bps }),
+    prob: modal.prob,
+    volume: mkt?.volume ?? 0,
+    id: modal.id,
+    platform: "Kalshi",
+  };
+}
+
 // The best headline market in each requested theme, in the given theme order.
 // Robust to whatever markets happen to be live - always populated as long as the
 // theme has any market. Used for the home-page hero.

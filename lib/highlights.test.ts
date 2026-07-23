@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headlineOdds, fedDistribution, fedPath, fedMeetingGrid } from "./highlights";
+import { headlineOdds, fedHeadlineTile, fedDistribution, fedPath, fedMeetingGrid } from "./highlights";
 import type { Market } from "./types";
 
 let seq = 0;
@@ -123,6 +123,37 @@ describe("headlineOdds", () => {
     );
     expect(tiles).toHaveLength(1);
     expect(tiles[0].title).toBe("CPI");
+  });
+});
+
+describe("fedHeadlineTile", () => {
+  const dist = {
+    ym: "2026-07",
+    total: 1.05,
+    outcomes: [
+      { label: "Cut 25", action: "cut", bps: 25, prob: 0.01, id: "KX-C25" },
+      { label: "Hold", action: "hold", bps: 0, prob: 0.77, id: "KX-HOLD" },
+      { label: "Hike 25", action: "hike", bps: 25, prob: 0.24, id: "KX-H25" },
+    ],
+  } as any;
+
+  it("returns the modal outcome as a Kalshi tile consistent with the distribution", () => {
+    const markets = [{ id: "KX-HOLD", volume: 5000 }] as any;
+    const tile = fedHeadlineTile(dist, markets);
+    expect(tile).not.toBeNull();
+    expect(tile!.id).toBe("KX-HOLD"); // modal (highest prob)
+    expect(tile!.prob).toBeCloseTo(0.77); // matches the distribution's Hold
+    expect(tile!.platform).toBe("Kalshi");
+    expect(tile!.volume).toBe(5000);
+    expect(tile!.title).toBe("Fed holds at the Jul 2026 meeting");
+  });
+
+  it("volume falls back to 0 if the market isn't found", () => {
+    expect(fedHeadlineTile(dist, [] as any)!.volume).toBe(0);
+  });
+
+  it("null when there is no distribution", () => {
+    expect(fedHeadlineTile(null, [] as any)).toBeNull();
   });
 });
 
