@@ -40,12 +40,10 @@ export interface FedFuturesPath {
 type BytesFetcher = (url: string) => Promise<Uint8Array>;
 
 const realBytesFetcher: BytesFetcher = async (url) => {
-  // Cache the 2 MB workbook for 6h (the Fed updates daily) so it isn't re-fetched
-  // on every 5-min page revalidation.
-  const resp = await fetch(url, {
-    headers: { "User-Agent": BROWSER_UA, Accept: "*/*" },
-    next: { revalidate: 21_600 },
-  });
+  // NB: can't use Next's fetch data cache here - the workbook is >2 MB, over Next's
+  // per-item cache limit (it errors). We cache the tiny PARSED result in-process
+  // instead (see fetchFedFuturesPath), so the 2 MB download is rare.
+  const resp = await fetch(url, { headers: { "User-Agent": BROWSER_UA, Accept: "*/*" }, cache: "no-store" });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return new Uint8Array(await resp.arrayBuffer());
 };
@@ -184,13 +182,22 @@ export function buildFedFuturesPath(rows: MptRow[]): FedFuturesPath | null {
   return { asOf: latest, currentRatePct, points };
 }
 
-export async function fetchFedFuturesPath(): Promise<FedFuturesPath | null> {
+// In-process cache of the tiny parsed result (the Fed updates daily). Keeps the
+// 2 MB download rare even though the page ISR-regenerates every 5 min; a warm
+// serverless instance reuses this. Serves stale on a later fetch failure.
+let _cache: { at: number; path: FedFuturesPath | null } | null = null;
+const CACHE_TTL_MS = 6 * 3_600_000;
+
+export async function fetchFedFuturesPath(nowMs: number = Date.now()): Promise<FedFuturesPath | null> {
+  if (_cache && nowMs - _cache.at < CACHE_TTL_MS) return _cache.path;
   try {
     const bytes = await _bytesFetcher(ATLANTA_FED_MPT_URL);
-    return buildFedFuturesPath(extractMptRows(bytes));
+    const path = buildFedFuturesPath(extractMptRows(bytes));
+    _cache = { at: nowMs, path };
+    return path;
   } catch (err) {
     console.warn("Atlanta Fed MPT fetch/parse failed", err);
-    return null;
+    return _cache?.path ?? null; // serve stale on failure if we have it
   }
 }
 
