@@ -4,8 +4,10 @@ import { EventCalendar } from "@/components/EventCalendar";
 import { FedDistributionBar, meetingLabel } from "@/components/charts/FedDistributionBar";
 import { FedPathChart } from "@/components/charts/FedPathChart";
 import { FedPathGrid } from "@/components/charts/FedPathGrid";
+import { FedPathOverlay } from "@/components/charts/FedPathOverlay";
 import { fetchTopMarkets } from "@/lib/board";
 import { headlineOdds, fedDistribution, fedPath, fedMeetingGrid } from "@/lib/highlights";
+import { fetchFedFuturesPath, buildOverlaySeries } from "@/lib/fedFutures";
 import { buildEventCalendar } from "@/lib/calendar";
 import { buildSparklines } from "@/lib/sparklines";
 import { fetchKalshiMarketHistory, fetchPolymarketMarketHistory } from "@/lib/sources";
@@ -32,6 +34,11 @@ export default async function HomePage() {
   const path = fedPath(board.markets, todayYm);
   const grid = fedMeetingGrid(board.markets, todayYm);
   const events = buildEventCalendar(board.markets, todayISO);
+
+  // OIS/SOFR futures-implied path (Atlanta Fed) to overlay against the crowd path.
+  // Best-effort: null (fetch/parse failure) falls back to the crowd-only chart.
+  const fedFutures = path.length >= 2 ? await fetchFedFuturesPath() : null;
+  const overlay = fedFutures ? buildOverlaySeries(fedFutures, path, now.getTime()) : [];
 
   // 7-day trend for the headline tiles (bounded: only the ~4 tile markets).
   const tileIds = new Set(tiles.map((t) => t.id));
@@ -67,12 +74,19 @@ export default async function HomePage() {
 
           {path.length >= 2 && (
             <section className="mb-8">
-              <h2 className="mb-1 text-lg font-medium">Implied Fed path</h2>
+              <h2 className="mb-1 text-lg font-medium">
+                {overlay.length >= 2 ? "Fed path: futures vs the crowd" : "Implied Fed path"}
+              </h2>
               <p className="mb-3 text-sm text-muted">
-                Market-implied cumulative rate change across upcoming meetings (bps vs today) - negative means
-                easing is priced in.
+                {overlay.length >= 2
+                  ? "Where the futures market (OIS/SOFR) and the prediction-market crowd each price the policy rate heading - a gap between the two is the disagreement."
+                  : "Market-implied cumulative rate change across upcoming meetings (bps vs today) - negative means easing is priced in."}
               </p>
-              <FedPathChart points={path} />
+              {overlay.length >= 2 && fedFutures ? (
+                <FedPathOverlay rows={overlay} asOf={fedFutures.asOf} />
+              ) : (
+                <FedPathChart points={path} />
+              )}
             </section>
           )}
 
