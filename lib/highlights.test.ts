@@ -45,6 +45,37 @@ describe("headlineOdds", () => {
     expect(tiles[0].title).toBe("US recession in 2026?");
   });
 
+  it("excludes retrospective 'when will the next ... start?' buckets so a current indicator headlines even at far lower volume", () => {
+    const tiles = headlineOdds(
+      [
+        m({ category: "Growth/Recession", title: "When will the next U.S. recession start?", volume: 130000, prob: 0.02 }),
+        m({ category: "Growth/Recession", title: "When will the next U.S. recession start?", volume: 96000, prob: 0.03 }),
+        m({ category: "Growth/Recession", title: "ISM Manufacturing PMI in July 2026?", volume: 3000, prob: 0.57 }),
+      ],
+      ["Growth/Recession"],
+    );
+    expect(tiles[0].title).toBe("ISM Manufacturing PMI in July 2026?");
+  });
+
+  it("prefers a current narrow indicator over a retrospective bucket when no clean market exists", () => {
+    const tiles = headlineOdds(
+      [
+        m({ category: "Growth/Recession", title: "When will the next U.S. recession start?", volume: 130000, prob: 0.02 }),
+        m({ category: "Growth/Recession", title: "Will real GDP increase by more than 2.5% in Q2 2026?", volume: 54000, prob: 0.6 }),
+      ],
+      ["Growth/Recession"],
+    );
+    expect(tiles[0].title).toBe("Will real GDP increase by more than 2.5% in Q2 2026?");
+  });
+
+  it("still emits a tile if a theme has ONLY retrospective markets (never drops the theme)", () => {
+    const tiles = headlineOdds(
+      [m({ category: "Growth/Recession", title: "When will the next U.S. recession start?", volume: 100, prob: 0.05 })],
+      ["Growth/Recession"],
+    );
+    expect(tiles).toHaveLength(1);
+  });
+
   it("falls back to top volume when every market in a theme is narrow", () => {
     const tiles = headlineOdds(
       [

@@ -21,6 +21,16 @@ export interface HeadlineTile {
 // cleaner.
 const NARROW_TITLE = /\bwhen will\b|\babove\b|\bbelow\b|\bbetween\b|>|<|\breach\b|\d+(?:\.\d+)?%|\bor (?:higher|lower)\b/i;
 
+// A retrospective "timing" family ("When will the next U.S. recession start?") is
+// split into one market per quarter with IDENTICAL titles, and Kalshi keeps every
+// bucket open (close_time at year-end) even for quarters already in the PAST. Any
+// single bucket is a dead headline - stale subject, no clean yes/no - so exclude
+// the whole family from headline ELIGIBILITY, not just from the "clean" tier. That
+// way a transient fetch miss on the cleaner market (Kalshi 429s under load) makes
+// the theme fall back to a current indicator (GDP / unemployment / payrolls)
+// rather than surfacing a past-quarter bucket on the hero.
+const RETROSPECTIVE_TITLE = /\bwhen will the next\b/i;
+
 // The best headline market in each requested theme, in the given theme order.
 // Robust to whatever markets happen to be live - always populated as long as the
 // theme has any market. Used for the home-page hero.
@@ -33,8 +43,13 @@ export function headlineOdds(
     const inTheme = markets.filter((m) => m.category === theme && m.prob != null && m.volume > 0);
     if (!inTheme.length) continue;
     const byVol = (best: Market, m: Market) => (m.volume > best.volume ? m : best);
-    const clean = inTheme.filter((m) => !NARROW_TITLE.test(m.title));
-    const top = (clean.length ? clean : inTheme).reduce(byVol);
+    // Prefer a current indicator: drop retrospective timing buckets from the pool,
+    // then prefer a clean directional title, falling back within the pool. Only use
+    // the retrospective family if it is somehow all a theme has (never drop a tile).
+    const eligible = inTheme.filter((m) => !RETROSPECTIVE_TITLE.test(m.title));
+    const pool = eligible.length ? eligible : inTheme;
+    const clean = pool.filter((m) => !NARROW_TITLE.test(m.title));
+    const top = (clean.length ? clean : pool).reduce(byVol);
     tiles.push({
       category: theme,
       title: top.title,
