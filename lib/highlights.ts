@@ -31,6 +31,18 @@ const NARROW_TITLE = /\bwhen will\b|\babove\b|\bbelow\b|\bbetween\b|>|<|\breach\
 // rather than surfacing a past-quarter bucket on the hero.
 const RETROSPECTIVE_TITLE = /\bwhen will the next\b/i;
 
+// Kalshi phrases a Fed hold as "Hike rates by 0bps" and a decision as a long
+// "Will the Federal Reserve ... at their July 2026 meeting?" - accurate but an
+// awkward hero headline. When a tile IS a parseable Fed outcome, show a clean
+// human phrasing instead (the prob/id/link are unchanged - still the same market).
+function fedTileTitle(fed: FedProposition): string {
+  const when = shortLabel(fed.ym); // "Jul 2026"
+  if (fed.action === "hold") return `Fed holds at the ${when} meeting`;
+  const verb = fed.action === "hike" ? "hikes" : "cuts";
+  if (fed.bps === -1) return `Fed ${verb} at the ${when} meeting`;
+  return `Fed ${verb} ${fed.bps}bps at the ${when} meeting`;
+}
+
 // The best headline market in each requested theme, in the given theme order.
 // Robust to whatever markets happen to be live - always populated as long as the
 // theme has any market. Used for the home-page hero.
@@ -50,9 +62,10 @@ export function headlineOdds(
     const pool = eligible.length ? eligible : inTheme;
     const clean = pool.filter((m) => !NARROW_TITLE.test(m.title));
     const top = (clean.length ? clean : pool).reduce(byVol);
+    const fed = parseFedProposition(top);
     tiles.push({
       category: theme,
-      title: top.title,
+      title: fed ? fedTileTitle(fed) : top.title,
       prob: top.prob as number,
       volume: top.volume,
       id: top.id,

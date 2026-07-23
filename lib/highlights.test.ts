@@ -76,6 +76,32 @@ describe("headlineOdds", () => {
     expect(tiles).toHaveLength(1);
   });
 
+  it("cleans a Fed hold market's awkward title for the hero tile", () => {
+    const tiles = headlineOdds(
+      [m({ category: "Rates/Fed", title: "Will the Federal Reserve Hike rates by 0bps at their July 2026 meeting?", endDate: "2026-07-29", volume: 5000, prob: 0.76 })],
+      ["Rates/Fed"],
+    );
+    expect(tiles[0].title).toBe("Fed holds at the Jul 2026 meeting");
+    expect(tiles[0].prob).toBe(0.76);
+    expect(tiles[0].id).toBe(tiles[0].id); // id/link unchanged - still the same market
+  });
+
+  it("cleans a Fed hike headline title with bps", () => {
+    const tiles = headlineOdds(
+      [m({ category: "Rates/Fed", title: "Will the Federal Reserve Hike rates by 25bps at their September 2026 meeting?", endDate: "2026-09-16", volume: 5000, prob: 0.3 })],
+      ["Rates/Fed"],
+    );
+    expect(tiles[0].title).toBe("Fed hikes 25bps at the Sep 2026 meeting");
+  });
+
+  it("leaves a non-Fed headline title untouched", () => {
+    const tiles = headlineOdds(
+      [m({ category: "Inflation", title: "Will CPI inflation be above 3.4% for the year ending July 2026?", volume: 5000, prob: 0.28 })],
+      ["Inflation"],
+    );
+    expect(tiles[0].title).toBe("Will CPI inflation be above 3.4% for the year ending July 2026?");
+  });
+
   it("falls back to top volume when every market in a theme is narrow", () => {
     const tiles = headlineOdds(
       [
