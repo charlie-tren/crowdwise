@@ -39,9 +39,20 @@ export async function buildSparklines(
   opts: { maxMarkets?: number; points?: number; minPoints?: number } = {},
 ): Promise<SparkData> {
   const { maxMarkets = 40, points = 20, minPoints = 3 } = opts;
-  const cands = markets
-    .filter(hasHistorySource)
-    .sort((a, b) => (b.volume || 0) - (a.volume || 0))
+  // Split the bounded budget ACROSS platforms so one venue's volume can't
+  // monopolise coverage: Polymarket's high-volume novelty markets would otherwise
+  // crowd every Kalshi card out of the top-N (and vice versa). Each platform gets
+  // its top markets by volume up to an even share of maxMarkets.
+  const withSource = markets.filter(hasHistorySource);
+  const byPlatform = new Map<string, Market[]>();
+  for (const m of withSource) {
+    const list = byPlatform.get(m.platform);
+    if (list) list.push(m);
+    else byPlatform.set(m.platform, [m]);
+  }
+  const share = Math.max(1, Math.ceil(maxMarkets / Math.max(1, byPlatform.size)));
+  const cands = [...byPlatform.values()]
+    .flatMap((list) => list.sort((a, b) => (b.volume || 0) - (a.volume || 0)).slice(0, share))
     .slice(0, maxMarkets);
 
   const results = await Promise.allSettled(

@@ -54,6 +54,16 @@ describe("buildSparklines", () => {
     expect(fetched.length).toBe(2); // the two highest-volume only
   });
 
+  it("splits the budget across platforms so high-volume Polymarket doesn't starve Kalshi", async () => {
+    const polys = [1, 2, 3].map((i) => m({ id: `0xp${i}`, platform: "Polymarket", series: "", clobTokenId: `t${i}`, volume: 1_000_000 + i }));
+    const kals = [1, 2, 3].map((i) => m({ id: `KX-${i}`, platform: "Kalshi", volume: 100 + i }));
+    const fetched: string[] = [];
+    await buildSparklines([...polys, ...kals], async (mkt) => { fetched.push(mkt.id); return pts([0.1, 0.2, 0.3]); }, { maxMarkets: 4 });
+    expect(fetched.length).toBe(4);
+    expect(fetched.filter((id) => id.startsWith("0x")).length).toBe(2); // 2 Polymarket
+    expect(fetched.filter((id) => id.startsWith("KX")).length).toBe(2); // 2 Kalshi - NOT starved despite far lower volume
+  });
+
   it("downsamples a long series to the requested point count", async () => {
     const long = Array.from({ length: 100 }, (_, i) => i / 100);
     const out = await buildSparklines([m({ id: "KX-A" })], async () => pts(long), { points: 10 });
