@@ -4,15 +4,13 @@ import { BoardFilters, type Filters } from "./BoardFilters";
 import { BoardTable } from "./BoardTable";
 import { MarketCard } from "./MarketCard";
 import { CATEGORIES } from "@/lib/taxonomy";
-import { representativeByEvent, groupByCategory } from "@/lib/board";
+import { representativeByEvent, groupByWindow } from "@/lib/board";
 import type { BoardPayload, Market } from "@/lib/types";
 
-type Sort = "volume" | "probability" | "soonest";
-
 export function BoardView({ initial }: { initial: BoardPayload }) {
-  const [view, setView] = useState<"cards" | "table">("cards");
-  const [sort, setSort] = useState<Sort>("volume");
+  const [view, setView] = useState<"table" | "cards">("table");
   const [spark, setSpark] = useState<{ sparks: Record<string, number[]>; moves: Record<string, number> } | null>(null);
+  const [showLong, setShowLong] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -22,6 +20,7 @@ export function BoardView({ initial }: { initial: BoardPayload }) {
       .catch(() => { /* sparklines are best-effort */ });
     return () => { cancelled = true; };
   }, []);
+
   const [filters, setFilters] = useState<Filters>({
     themes: new Set(CATEGORIES), platform: "All", search: "", probLo: 0, probHi: 100, headlineOnly: true,
   });
@@ -35,78 +34,69 @@ export function BoardView({ initial }: { initial: BoardPayload }) {
       const s = filters.search.toLowerCase();
       rows = rows.filter((r) => r.title.toLowerCase().includes(s));
     }
-    if (sort === "probability") {
-      rows.sort((a, b) => (b.prob ?? -1) - (a.prob ?? -1));
-    } else if (sort === "soonest") {
-      rows.sort((a, b) => {
-        const da = a.endDate ? new Date(`${a.endDate}T00:00:00Z`).getTime() : NaN;
-        const db = b.endDate ? new Date(`${b.endDate}T00:00:00Z`).getTime() : NaN;
-        const aValid = !Number.isNaN(da), bValid = !Number.isNaN(db);
-        if (aValid && bValid) return da - db;
-        if (aValid) return -1;
-        if (bValid) return 1;
-        return 0;
-      });
-    } else {
-      rows.sort((a, b) => (b.volume || 0) - (a.volume || 0));
-    }
     return rows;
-  }, [initial.markets, filters, sort]);
+  }, [initial.markets, filters]);
 
-  const grouped = useMemo(() => groupByCategory(filtered, 25), [filtered]);
-  const totals = useMemo(() => groupByCategory(filtered), [filtered]);
+  // Window relative to the server-stamped fetch time (NOT Date.now()) so the SSR
+  // and client hydration compute identical windows - avoids a hydration mismatch.
+  const windows = useMemo(
+    () => groupByWindow(filtered, new Date(initial.fetchedAt).getTime()),
+    [filtered, initial.fetchedAt],
+  );
+  const moves = spark?.moves ?? initial.moves;
+  const sparks = spark?.sparks;
 
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between">
+      <div className="mb-1 flex items-center justify-between gap-3">
         <p className="text-[13px] text-muted">
-          {filtered.length} markets · updated {new Date(initial.fetchedAt).toLocaleString()}
+          {filtered.length} markets · grouped by when they resolve ·{" "}
+          <span suppressHydrationWarning>updated {new Date(initial.fetchedAt).toLocaleString()}</span>
         </p>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-xs text-muted">
-            Sort
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as Sort)}
-              className="rounded-lg border border-white/10 bg-panel/40 px-2 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        <div className="inline-flex shrink-0 rounded-lg border border-white/10 bg-panel/40 p-0.5 text-xs">
+          {(["table", "cards"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`rounded-md px-2.5 py-1 capitalize transition-colors ${view === v ? "bg-white/[0.08] text-[var(--text)]" : "text-muted hover:text-[var(--text)]"}`}
             >
-              <option value="volume">Volume</option>
-              <option value="probability">Probability</option>
-              <option value="soonest">Soonest</option>
-            </select>
-          </label>
-          <button className="text-xs text-muted underline" onClick={() => setView(view === "cards" ? "table" : "cards")}>
-            {view === "cards" ? "Table view" : "Card view"}
-          </button>
+              {v}
+            </button>
+          ))}
         </div>
       </div>
-      <p className="mb-4 text-[13px] text-muted">Bar length = implied probability.</p>
+      <p className="mb-4 text-[13px] text-[var(--muted-dim)]">
+        Near-term macro leads; long-dated markets sink to the bottom. Bar length = implied probability.
+      </p>
       <BoardFilters filters={filters} setFilters={setFilters} />
-      {Object.keys(grouped).length === 0 && <p className="text-muted">No markets match the current filters.</p>}
-      {Object.entries(grouped).map(([cat, members]) => {
-        const total = totals[cat]?.length ?? members.length;
+
+      {windows.length === 0 && <p className="text-muted">No markets match the current filters.</p>}
+
+      {windows.map((w) => {
+        const collapsed = w.key === "long" && !showLong;
         return (
-          <section key={cat} className="mb-10">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted">{cat}</h2>
+          <section key={w.key} className="mb-9">
+            <div className="mb-3 flex items-baseline gap-2">
+              <h2 className="text-sm font-semibold text-[var(--text)]">{w.label}</h2>
               <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] tabular-nums text-muted">
-                {members.length}{total > members.length ? ` of ${total}` : ""}
+                {w.markets.length}
               </span>
+              <span className="hidden text-[12px] text-[var(--muted-dim)] sm:inline">{w.sublabel}</span>
+              {w.key === "long" && (
+                <button onClick={() => setShowLong((s) => !s)} className="ml-auto text-[12px] text-accent hover:underline">
+                  {showLong ? "Hide" : `Show ${w.markets.length}`}
+                </button>
+              )}
             </div>
-            {view === "cards" ? (
+            {!collapsed && (view === "table" ? (
+              <BoardTable markets={w.markets} moves={moves} sparks={sparks} />
+            ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {members.map((m) => (
-                  <MarketCard
-                    key={m.id}
-                    m={m}
-                    move={spark?.moves[m.id] ?? initial.moves[m.id]}
-                    spark={spark?.sparks[m.id]}
-                  />
+                {w.markets.map((m) => (
+                  <MarketCard key={m.id} m={m} move={moves[m.id]} spark={sparks?.[m.id]} />
                 ))}
               </div>
-            ) : (
-              <BoardTable markets={members} moves={initial.moves} />
-            )}
+            ))}
           </section>
         );
       })}

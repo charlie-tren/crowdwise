@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { fetchTopMarkets, groupByCategory, representativeByEvent } from "./board";
+import { fetchTopMarkets, groupByCategory, representativeByEvent, resolutionWindowKey, groupByWindow } from "./board";
 import * as sources from "./sources";
 
 afterEach(() => sources.resetHttpGetJson());
@@ -105,5 +105,46 @@ describe("representativeByEvent", () => {
       { id: "k1", event: "E1", volume: 3 }, { id: "k2", event: "E1", volume: 4 },
     ] as any;
     expect(new Set(representativeByEvent(records).map((r) => r.id))).toEqual(new Set(["p1", "p2", "k2"]));
+  });
+});
+
+describe("resolutionWindowKey", () => {
+  it("buckets by days-to-resolution", () => {
+    expect(resolutionWindowKey(0)).toBe("week");
+    expect(resolutionWindowKey(7)).toBe("week");
+    expect(resolutionWindowKey(8)).toBe("month");
+    expect(resolutionWindowKey(31)).toBe("month");
+    expect(resolutionWindowKey(32)).toBe("quarter");
+    expect(resolutionWindowKey(180)).toBe("quarter");
+    expect(resolutionWindowKey(181)).toBe("long");
+  });
+  it("sinks undated and already-past markets to long", () => {
+    expect(resolutionWindowKey(null)).toBe("long");
+    expect(resolutionWindowKey(-3)).toBe("long");
+  });
+});
+
+describe("groupByWindow", () => {
+  const now = Date.UTC(2026, 6, 23); // 2026-07-23
+
+  it("orders windows, volume-sorts within, and sinks novelty/past/undated to long", () => {
+    const records = [
+      { id: "wk", endDate: "2026-07-25", volume: 10 }, // 2d -> week
+      { id: "mo", endDate: "2026-08-10", volume: 20 }, // ~18d -> month
+      { id: "qt", endDate: "2026-10-01", volume: 30 }, // ~70d -> quarter
+      { id: "nov", endDate: "2028-11-01", volume: 999 }, // ~838d, huge volume, still sinks
+      { id: "past", endDate: "2026-07-01", volume: 5 }, // past -> long
+      { id: "und", endDate: "", volume: 7 }, // undated -> long
+    ] as any;
+    const w = groupByWindow(records, now);
+    expect(w.map((x) => x.key)).toEqual(["week", "month", "quarter", "long"]);
+    expect(w.find((x) => x.key === "week")!.markets.map((m: any) => m.id)).toEqual(["wk"]);
+    // long-dated sorted by volume desc: nov(999), und(7), past(5)
+    expect(w.find((x) => x.key === "long")!.markets.map((m: any) => m.id)).toEqual(["nov", "und", "past"]);
+  });
+
+  it("omits empty windows", () => {
+    const w = groupByWindow([{ id: "a", endDate: "2026-07-25", volume: 1 }] as any, now);
+    expect(w.map((x) => x.key)).toEqual(["week"]);
   });
 });
