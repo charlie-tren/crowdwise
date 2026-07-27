@@ -1,9 +1,10 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
 import { pct } from "@/lib/format";
 import type { CrossVenuePair } from "@/lib/crossVenue";
 
 const DIVERGENCE_NOTABLE = 0.05;
+const KALSHI_COLOUR = "#4c9be8";
+const POLYMARKET_COLOUR = "#8ea2ff";
 
 export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
   return (
@@ -20,57 +21,38 @@ export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
       ) : (
         <div className="flex flex-col gap-3">
           {pairs.map((pair) => {
-            const kx = pair.kalshiProb * 100;
-            const px = pair.polymarketProb * 100;
-            const spanLeft = Math.min(kx, px);
-            const spanWidth = Math.abs(kx - px);
             const gapPp = pair.divergence * 100;
             const kalshiLower = pair.kalshiProb <= pair.polymarketProb;
             const lowerName = kalshiLower ? "Kalshi" : "Polymarket";
             const notable = pair.divergence >= DIVERGENCE_NOTABLE;
-            // The lower-priced venue's flag sits above the track, the higher one below,
-            // so the two labels never collide even when the ticks are close together.
-            const flag = (name: string, x: number, above: boolean) => (
-              <div
-                className="absolute flex -translate-x-1/2 flex-col items-center"
-                style={{ left: `${x}%`, [above ? "bottom" : "top"]: "calc(50% + 12px)" } as CSSProperties}
+            const bar = (name: string, id: string, prob: number, colour: string) => (
+              <Link
+                href={`/market/${encodeURIComponent(id)}`}
+                className="group grid grid-cols-[86px_1fr_52px] items-center gap-3"
               >
-                {above ? (
-                  <>
-                    <span className="text-[10px] uppercase tracking-wide text-muted">{name}</span>
-                    <span className="text-[13px] font-semibold tabular-nums text-[var(--text)]">{pct(x / 100)}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-[13px] font-semibold tabular-nums text-[var(--text)]">{pct(x / 100)}</span>
-                    <span className="text-[10px] uppercase tracking-wide text-muted">{name}</span>
-                  </>
-                )}
-              </div>
+                <span className="text-[13px] text-muted group-hover:text-[var(--text)]">{name}</span>
+                <span className="relative h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                  <span
+                    className="absolute inset-y-0 left-0 rounded-full"
+                    style={{ width: `${(prob * 100).toFixed(1)}%`, background: colour }}
+                  />
+                </span>
+                <span className="text-right text-[13px] font-semibold tabular-nums text-[var(--text)]">
+                  {pct(prob)}
+                </span>
+              </Link>
             );
             return (
               <div key={pair.key} className="rounded-xl border border-white/[0.06] bg-panel/60 p-5">
                 <span className="text-[15px] font-medium text-[var(--text)]">{pair.label}</span>
 
-                {/* gap bar: both venues on one 0-100% probability track */}
-                <div className="mt-9 mb-8">
-                  <div className="relative mx-1 h-1.5">
-                    <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded bg-white/[0.06]" />
-                    <div
-                      className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded"
-                      style={{ left: `${spanLeft}%`, width: `${spanWidth}%`, background: "linear-gradient(90deg,rgba(76,155,232,.3),rgba(76,155,232,.6))" }}
-                    />
-                    <div className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-[var(--text)]" style={{ left: `${kx}%` }} />
-                    <div className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded bg-[var(--text)]" style={{ left: `${px}%` }} />
-                    {flag("Kalshi", kx, kalshiLower)}
-                    {flag("Polymarket", px, !kalshiLower)}
-                  </div>
-                  <div className="mt-1.5 flex justify-between px-0.5 text-[10px] text-[var(--muted-dim)]">
-                    <span>0%</span><span>50%</span><span>100%</span>
-                  </div>
+                {/* aligned probability bars, both venues on the same 0-100% scale */}
+                <div className="mt-4 flex flex-col gap-3">
+                  {bar("Kalshi", pair.kalshi.id, pair.kalshiProb, KALSHI_COLOUR)}
+                  {bar("Polymarket", pair.polymarket.id, pair.polymarketProb, POLYMARKET_COLOUR)}
                 </div>
 
-                <div className="flex items-center gap-2 text-[13px] text-muted">
+                <div className="mt-3 flex items-center gap-2 text-[13px] text-muted">
                   <span className={"tabular-nums font-semibold " + (notable ? "text-accent" : "text-[var(--text)]")}>
                     {gapPp.toFixed(1)}pp apart
                   </span>
@@ -78,13 +60,7 @@ export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
                 </div>
 
                 <p className="mt-3 text-[13px] text-[var(--muted-dim)]">
-                  <Link href={`/market/${encodeURIComponent(pair.kalshi.id)}`} className="hover:text-[var(--text)] hover:underline">
-                    {pair.kalshi.title}
-                  </Link>
-                  {" · "}
-                  <Link href={`/market/${encodeURIComponent(pair.polymarket.id)}`} className="hover:text-[var(--text)] hover:underline">
-                    {pair.polymarket.title}
-                  </Link>
+                  {pair.kalshi.title} · {pair.polymarket.title}
                 </p>
               </div>
             );
