@@ -43,6 +43,29 @@ function fedTileTitle(fed: FedProposition): string {
   return `Fed ${verb} ${fed.bps}bps at the ${when} meeting`;
 }
 
+// The verbose "Will the upper bound of the federal funds rate be above 3.75%
+// following the Fed's Sep 16, 2026 meeting?" family is a rate-LEVEL market, not
+// a hike/cut/hold, so parseFedProposition returns null and it keeps its raw
+// title. Clean it to "Fed funds >3.75% after the Sep 2026 meeting", taking the
+// month from the market's own resolution date rather than re-parsing the title.
+function fedRateLevelTitle(m: Market): string | null {
+  if (!m.endDate) return null;
+  const mt = m.title.match(/upper bound of the federal funds rate (?:be|is)?\s*(above|below)\s*([\d.]+)\s*%/i);
+  if (!mt) return null;
+  const dir = mt[1].toLowerCase() === "above" ? ">" : "<";
+  return `Fed funds ${dir}${mt[2]}% after the ${shortLabel(m.endDate.slice(0, 7))} meeting`;
+}
+
+// A clean, human display title for any market: canonical Fed phrasing where the
+// title is a parseable Fed decision or rate-level market, otherwise the raw
+// title untouched. Used wherever a market title is shown (board, cards, ladder)
+// so the awkward Kalshi long-form phrasing never reaches the user.
+export function displayTitle(m: Market): string {
+  const fed = parseFedProposition(m);
+  if (fed) return fedTileTitle(fed);
+  return fedRateLevelTitle(m) ?? m.title;
+}
+
 // The Rates/Fed headline tile, derived from the SAME Kalshi Fed distribution as
 // the on-page Fed viz (its most-likely / modal outcome). The generic headlineOdds
 // picks the highest-VOLUME Fed market across venues, which on some days is a

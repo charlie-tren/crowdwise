@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headlineOdds, fedHeadlineTile, fedDistribution, fedPath, fedMeetingGrid } from "./highlights";
+import { headlineOdds, fedHeadlineTile, fedDistribution, fedPath, fedMeetingGrid, displayTitle } from "./highlights";
 import type { Market } from "./types";
 
 let seq = 0;
@@ -277,5 +277,36 @@ describe("fedMeetingGrid", () => {
       "2026-01",
     );
     expect(grid).toHaveLength(0);
+  });
+});
+
+describe("displayTitle", () => {
+  it("cleans a Fed hold decision title", () => {
+    expect(
+      displayTitle(m({ title: "Will the Federal Reserve Hike rates by 0bps at their September 2026 meeting?", endDate: "2026-09-16" })),
+    ).toBe("Fed holds at the Sep 2026 meeting");
+  });
+
+  it("cleans a Fed cut decision title", () => {
+    expect(
+      displayTitle(m({ title: "Will the Federal Reserve Cut rates by 25bps at their September 2026 meeting?", endDate: "2026-09-16" })),
+    ).toBe("Fed cuts 25bps at the Sep 2026 meeting");
+  });
+
+  it("cleans the verbose rate-level 'upper bound above X%' family using the resolution month", () => {
+    expect(
+      displayTitle(m({ title: "Will the upper bound of the federal funds rate be above 3.75% following the Fed's Sep 16, 2026 meeting?", endDate: "2026-09-16" })),
+    ).toBe("Fed funds >3.75% after the Sep 2026 meeting");
+  });
+
+  it("handles the 'below' direction", () => {
+    expect(
+      displayTitle(m({ title: "Will the upper bound of the federal funds rate be below 3.00% following the Fed's Dec 2026 meeting?", endDate: "2026-12-16" })),
+    ).toBe("Fed funds <3.00% after the Dec 2026 meeting");
+  });
+
+  it("passes a non-Fed title through unchanged", () => {
+    const title = "US recession called in 2026";
+    expect(displayTitle(m({ category: "Growth/Recession", title }))).toBe(title);
   });
 });

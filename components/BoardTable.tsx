@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { pct, fmtVol, daysTo, probFill } from "@/lib/format";
 import { THEME_COLOURS } from "@/lib/themeColours";
+import { displayTitle } from "@/lib/highlights";
 import { Sparkline } from "./charts/Sparkline";
 import type { Market } from "@/lib/types";
 
@@ -59,9 +60,9 @@ export function BoardTable({
                   <Link
                     href={`/market/${encodeURIComponent(m.id)}`}
                     className="block max-w-[44ch] truncate text-[var(--text)] group-hover:text-accent"
-                    title={m.title}
+                    title={displayTitle(m)}
                   >
-                    {m.title}
+                    {displayTitle(m)}
                   </Link>
                   <span className="text-[11px] text-[var(--muted-dim)]">{m.platform}</span>
                 </td>

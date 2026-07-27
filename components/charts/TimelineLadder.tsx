@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { THEME_COLOURS } from "@/lib/themeColours";
+import { displayTitle } from "@/lib/highlights";
 import type { Market } from "@/lib/types";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -73,7 +74,7 @@ export function TimelineLadder({ markets }: { markets: Market[] }) {
           >
             <div className="flex items-center gap-2 pr-3">
               <span className="h-2 w-2 flex-none rounded-full" style={{ background: colour }} />
-              <span className="truncate text-[12.5px] text-[var(--text)]">{r.title}</span>
+              <span className="truncate text-[12.5px] text-[var(--text)]">{displayTitle(r)}</span>
             </div>
             <div className="relative h-6">
               <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/[0.05]" />
