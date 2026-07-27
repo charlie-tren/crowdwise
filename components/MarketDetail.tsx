@@ -13,11 +13,25 @@ export function MarketDetail({ m, related }: { m: Market; related?: Market[] }) 
   const [lookback, setLookback] = useState(90);
 
   useEffect(() => {
-    if (m.platform !== "Kalshi" || !m.series) { setPoints([]); return; }
+    let url: string | null = null;
+    if (m.platform === "Kalshi" && m.series) {
+      url = `/api/history/${encodeURIComponent(m.series)}/${encodeURIComponent(m.id)}?days=${lookback}&interval=1440`;
+    } else if (m.platform === "Polymarket" && m.clobTokenId) {
+      // finer resolution on the short window, ~daily on longer ones (keeps point counts sane)
+      const fidelity = lookback <= 30 ? 240 : 1440;
+      url = `/api/poly-history/${encodeURIComponent(m.clobTokenId)}?days=${lookback}&fidelity=${fidelity}`;
+    }
+    if (!url) { setPoints([]); return; }
     setPoints(null);
-    fetch(`/api/history/${encodeURIComponent(m.series)}/${encodeURIComponent(m.id)}?days=${lookback}&interval=1440`)
-      .then((r) => r.json()).then((d) => setPoints(d.points ?? [])).catch(() => setPoints([]));
-  }, [m.id, m.series, m.platform, lookback]);
+    let cancelled = false;
+    fetch(url)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setPoints(d.points ?? []); })
+      .catch(() => { if (!cancelled) setPoints([]); });
+    return () => { cancelled = true; };
+  }, [m.id, m.series, m.platform, m.clobTokenId, lookback]);
+
+  const hasHistory = (m.platform === "Kalshi" && !!m.series) || (m.platform === "Polymarket" && !!m.clobTokenId);
 
   const d = daysTo(m.endDate);
   return (
@@ -34,7 +48,7 @@ export function MarketDetail({ m, related }: { m: Market; related?: Market[] }) 
         <span>Vol {fmtVol(m.volume)}</span>
         <span>Resolves {m.endDate || "—"}{d != null && d >= 0 ? ` (${d}d)` : ""}</span>
       </div>
-      {m.platform === "Kalshi" && m.series && (
+      {hasHistory && (
         <div className="mb-3 flex gap-2">
           {[30, 90, 180].map((n) => (
             <button key={n} onClick={() => setLookback(n)}
