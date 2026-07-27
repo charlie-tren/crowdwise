@@ -21,7 +21,7 @@ export function FedPathGrid({ meetings }: { meetings: FedMeeting[] }) {
       <div
         role="img"
         aria-label="Market-implied outcome distribution for each upcoming FOMC meeting"
-        className="flex items-end gap-3 overflow-x-auto pb-1"
+        className="flex items-end gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {meetings.map((mtg) => {
           const denom = mtg.total > 0 ? mtg.total : 1;

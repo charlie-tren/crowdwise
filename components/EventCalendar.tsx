@@ -16,11 +16,15 @@ function awayLabel(days: number): string {
   return `in ${w}w`;
 }
 
-// A forward agenda rail of upcoming market resolutions - scrolls horizontally.
+// A forward agenda rail of upcoming market resolutions. Scrolls horizontally,
+// but the native scrollbar is hidden and the ends fade into the page so the rail
+// reads as a deliberate strip rather than a browser scroll widget; the right-edge
+// fade doubles as the "there's more" affordance.
 export function EventCalendar({ events }: { events: CalendarEvent[] }) {
   if (!events.length) return null;
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
+    <div className="relative">
+      <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {events.map((e) => {
         const { day, mon } = fmtDate(e.date);
         const colour = THEME_COLOURS[e.category] ?? "#4c9be8";
@@ -50,6 +54,8 @@ export function EventCalendar({ events }: { events: CalendarEvent[] }) {
           </Link>
         );
       })}
+      </div>
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-14 bg-gradient-to-l from-[var(--bg)] to-transparent" />
     </div>
   );
 }
