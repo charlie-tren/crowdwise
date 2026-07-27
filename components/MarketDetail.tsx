@@ -5,6 +5,7 @@ import { ProbTimeline } from "./charts/ProbTimeline";
 import { ProbBadge } from "./ProbBadge";
 import { MarketCard } from "./MarketCard";
 import { fmtVol, daysTo } from "@/lib/format";
+import { displayTitle } from "@/lib/highlights";
 import type { Market, HistoryPoint } from "@/lib/types";
 
 export function MarketDetail({ m, related }: { m: Market; related?: Market[] }) {
@@ -25,7 +26,7 @@ export function MarketDetail({ m, related }: { m: Market; related?: Market[] }) 
         ← Back to board
       </Link>
       <div className="mb-4 flex items-start justify-between gap-4">
-        <h1 className="text-[28px] font-semibold tracking-[-0.02em]">{m.title}</h1>
+        <h1 className="text-[28px] font-semibold tracking-[-0.02em]">{displayTitle(m)}</h1>
         <ProbBadge prob={m.prob} showMeter className="text-[40px]" />
       </div>
       <div className="mb-6 flex flex-wrap gap-4 text-[13px] text-muted">
