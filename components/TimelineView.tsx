@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { CATEGORIES } from "@/lib/taxonomy";
 import { ThemeChip } from "./ThemeChip";
-import { TimelineBubble } from "./charts/TimelineBubble";
+import { TimelineLadder } from "./charts/TimelineLadder";
 import { representativeByEvent } from "@/lib/board";
 import { daysTo } from "@/lib/format";
 import type { Market } from "@/lib/types";
@@ -17,13 +17,13 @@ export function TimelineView({ markets }: { markets: Market[] }) {
     <div>
       <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Timeline</h1>
       <p className="mb-4 text-sm text-muted">
-        Term structure of priced macro risk: each market by resolution date (x) and implied probability (y), bubble size = volume.
+        Term structure of priced macro risk: every market laid out by when it resolves, carrying its implied probability. Dot size = volume.
       </p>
       <div className="mb-4 flex flex-wrap gap-2">
         {CATEGORIES.map((t) => <ThemeChip key={t} theme={t} active={themes.has(t)} onClick={() => toggle(t)} />)}
       </div>
-      <TimelineBubble markets={pts} />
-      <p className="mt-2 text-[13px] text-muted">{pts.length} dated markets · bubble size proportional to volume · colour = theme.</p>
+      <TimelineLadder markets={pts} />
+      <p className="mt-2 text-[13px] text-muted">{pts.length} dated markets · sorted by resolution date · dot size ∝ volume · colour = theme.</p>
     </div>
   );
 }
