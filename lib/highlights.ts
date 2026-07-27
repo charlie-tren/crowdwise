@@ -43,41 +43,74 @@ function fedTileTitle(fed: FedProposition): string {
   return `Fed ${verb} ${fed.bps}bps at the ${when} meeting`;
 }
 
-// The verbose "Will the upper bound of the federal funds rate be above 3.75%
-// following the Fed's Sep 16, 2026 meeting?" family is a rate-LEVEL market, not
-// a hike/cut/hold, so parseFedProposition returns null and it keeps its raw
-// title. Clean it to "Fed funds >3.75% after the Sep 2026 meeting", taking the
-// month from the market's own resolution date rather than re-parsing the title.
-function fedRateLevelTitle(m: Market): string | null {
-  if (!m.endDate) return null;
-  const mt = m.title.match(/upper bound of the federal funds rate (?:be|is)?\s*(above|below)\s*([\d.]+)\s*%/i);
+const MONTHS_FULL = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+
+// "…September 2026 meeting" -> "Sep 2026", read from the title when the market
+// has no clean endDate (some Polymarket Fed markets don't).
+function titleMeetingLabel(title: string): string | null {
+  const mt = title.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})\b/i);
   if (!mt) return null;
-  const dir = mt[1].toLowerCase() === "above" ? ">" : "<";
-  return `Fed funds ${dir}${mt[2]}% after the ${shortLabel(m.endDate.slice(0, 7))} meeting`;
+  const i = MONTHS_FULL.indexOf(mt[1].toLowerCase());
+  return i < 0 ? null : `${MONTHS_SHORT[i]} ${mt[2]}`;
 }
 
-// Open-ended magnitude markets ("Will the Fed increase interest rates by 50+ bps
-// after the July 2026 meeting?") aren't caught by parseFedProposition - its bps
-// regex wants "50bps", not "50+ bps" - so clean them HERE rather than widening
-// the shared parser, which also drives cross-venue matching and the Fed
-// distribution (real blast radius for a cosmetic gain).
-function fedMagnitudeTitle(m: Market): string | null {
-  if (!m.endDate || m.category !== "Rates/Fed") return null;
-  if (!/\bfed(?:eral reserve)?\b/i.test(m.title)) return null;
-  const mt = m.title.match(/\b(increase|raise|hike|decrease|lower|cut)s?\b[^?]*?\bby\s+([\d.]+)\+\s*bps/i);
-  if (!mt) return null;
-  const verb = /increase|raise|hike/i.test(mt[1]) ? "hikes" : "cuts";
-  return `Fed ${verb} ${mt[2]}+bps after the ${shortLabel(m.endDate.slice(0, 7))} meeting`;
+// Cleans the Fed markets that parseFedProposition can't (rate-level, open-ended
+// magnitude, per-meeting phrasings with no endDate, count-of-cuts, and "before
+// YYYY" horizon markets) into short canonical phrasing. Deliberately scoped to
+// the Fed - it never touches the shared parser (which drives cross-venue matching
+// and the distribution), and it leaves non-Fed markets and multi-meeting combo
+// markets ("Pause-Pause-Pause in the next three decisions") on their raw titles.
+// Returns null when nothing matches, so displayTitle falls back to the raw title.
+function fedFallbackTitle(m: Market): string | null {
+  if (m.category !== "Rates/Fed") return null;
+  const t = m.title;
+  if (!/\bfed(?:eral reserve)?\b/i.test(t)) return null;
+  if (/\becb\b|european central|bank of (japan|england|canada|russia)|\bboj\b|\bboe\b/i.test(t)) return null;
+  const when = m.endDate ? shortLabel(m.endDate.slice(0, 7)) : titleMeetingLabel(t);
+  let mt: RegExpMatchArray | null;
+
+  // rate level: "upper bound of the federal funds rate be above/below X%"
+  if ((mt = t.match(/upper bound of the federal funds rate (?:be|is)?\s*(above|below)\s*([\d.]+)\s*%/i)) && when) {
+    return `Fed funds ${mt[1].toLowerCase() === "above" ? ">" : "<"}${mt[2]}% after the ${when} meeting`;
+  }
+  // open-ended magnitude: "increase/decrease … by 50+ bps"
+  if ((mt = t.match(/\b(increase|raise|hike|decrease|lower|cut)s?\b[^?]*?\bby\s+([\d.]+)\+\s*bps/i)) && when) {
+    return `Fed ${/increase|raise|hike/i.test(mt[1]) ? "hikes" : "cuts"} ${mt[2]}+bps after the ${when} meeting`;
+  }
+  // per-meeting magnitude with the month in the title: "decrease … by 25 bps after the September 2026 meeting"
+  if ((mt = t.match(/\b(increase|raise|hike|decrease|lower|cut)s?\b[^?]*?\bby\s+([\d.]+)\s*bps\b[^?]*?\bafter the\b/i)) && when) {
+    return `Fed ${/increase|raise|hike/i.test(mt[1]) ? "hikes" : "cuts"} ${mt[2]}bps at the ${when} meeting`;
+  }
+  // per-meeting hold: "no change in Fed interest rates after the July 2026 meeting"
+  if (/no change[^?]*\bafter the\b/i.test(t) && when) {
+    return `Fed holds at the ${when} meeting`;
+  }
+  // count of cuts in a year: "Will 3 Fed rate cuts happen in 2026?", "no …", "12 or more …"
+  if ((mt = t.match(/\b(no|\d+)\s*(?:or more\s*)?fed rate cuts?\s+happen in\s+(\d{4})/i))) {
+    const orMore = /or more/i.test(t);
+    const n = mt[1].toLowerCase() === "no" ? "No" : mt[1] + (orMore ? "+" : "");
+    const noun = mt[1] === "1" && !orMore ? "cut" : "cuts";
+    return `${n} Fed rate ${noun} in ${mt[2]}`;
+  }
+  // horizon bound level: "Fed's lower/upper bound reach X% or lower/higher before 2027"
+  if ((mt = t.match(/\b(lower|upper) bound reach\s+([\d.]+)%?\s*or\s+(lower|higher)\s+before\s+(\d{4})/i))) {
+    return `Fed ${mt[1].toLowerCase()} bound ${mt[3].toLowerCase() === "lower" ? "≤" : "≥"}${mt[2]}% before ${mt[4]}`;
+  }
+  // horizon rate direction: "Fed cut rates before 2027", "raise the target range … before 2027"
+  if ((mt = t.match(/\b(cut|lower|decrease|hike|raise|increase)s?\b[^?]*\bbefore\s+(\d{4})/i))) {
+    return `Fed ${/cut|lower|decrease/i.test(mt[1]) ? "cuts" : "raises"} rates before ${mt[2]}`;
+  }
+  return null;
 }
 
-// A clean, human display title for any market: canonical Fed phrasing where the
-// title is a parseable Fed decision, rate-level, or open-ended magnitude market,
-// otherwise the raw title untouched. Used wherever a market title is shown
-// (board, cards, ladder) so the awkward Kalshi long-form never reaches the user.
+// A clean, human display title for any market: canonical phrasing for the Fed
+// families (parseable decisions via fedTileTitle, everything else via
+// fedFallbackTitle), otherwise the raw title untouched. Used wherever a market
+// title is shown (board, cards, ladder) so awkward long-form never reaches users.
 export function displayTitle(m: Market): string {
   const fed = parseFedProposition(m);
   if (fed) return fedTileTitle(fed);
-  return fedRateLevelTitle(m) ?? fedMagnitudeTitle(m) ?? m.title;
+  return fedFallbackTitle(m) ?? m.title;
 }
 
 // The Rates/Fed headline tile, derived from the SAME Kalshi Fed distribution as

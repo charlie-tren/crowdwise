@@ -319,6 +319,34 @@ describe("displayTitle", () => {
     expect(displayTitle(m({ title }))).toBe(title);
   });
 
+  it("cleans per-meeting markets that lack an endDate, reading the month from the title", () => {
+    expect(
+      displayTitle(m({ title: "Will the Fed decrease interest rates by 25 bps after the September 2026 meeting?", endDate: "" })),
+    ).toBe("Fed cuts 25bps at the Sep 2026 meeting");
+    expect(
+      displayTitle(m({ title: "Will there be no change in Fed interest rates after the July 2026 meeting?", endDate: "" })),
+    ).toBe("Fed holds at the Jul 2026 meeting");
+  });
+
+  it("cleans the count-of-cuts family", () => {
+    expect(displayTitle(m({ title: "Will 3 Fed rate cuts happen in 2026?" }))).toBe("3 Fed rate cuts in 2026");
+    expect(displayTitle(m({ title: "Will 1 Fed rate cut happen in 2026?" }))).toBe("1 Fed rate cut in 2026");
+    expect(displayTitle(m({ title: "Will no Fed rate cuts happen in 2026?" }))).toBe("No Fed rate cuts in 2026");
+    expect(displayTitle(m({ title: "Will 12 or more Fed rate cuts happen in 2026?" }))).toBe("12+ Fed rate cuts in 2026");
+  });
+
+  it("cleans the 'before YYYY' horizon families", () => {
+    expect(displayTitle(m({ title: "Will the Fed's lower bound reach 2.75% or lower before 2027?" }))).toBe("Fed lower bound ≤2.75% before 2027");
+    expect(displayTitle(m({ title: "Will the Fed's upper bound reach 5.25% or higher before 2027?" }))).toBe("Fed upper bound ≥5.25% before 2027");
+    expect(displayTitle(m({ title: "Will the Federal Reserve cut rates before 2027?" }))).toBe("Fed cuts rates before 2027");
+    expect(displayTitle(m({ title: "Will the Federal Reserve raise the target range for the federal funds rate before 2027?" }))).toBe("Fed raises rates before 2027");
+  });
+
+  it("does not touch ECB / BoJ markets in the Rates/Fed theme", () => {
+    const title = "No change in Bank of Japan's interest rates after the July 2026 meeting?";
+    expect(displayTitle(m({ title }))).toBe(title);
+  });
+
   it("passes a non-Fed title through unchanged", () => {
     const title = "US recession called in 2026";
     expect(displayTitle(m({ category: "Growth/Recession", title }))).toBe(title);
