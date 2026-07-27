@@ -1,5 +1,6 @@
 import type { Market } from "./types";
 import type { Category } from "./taxonomy";
+import { displayTitle } from "./highlights";
 
 export interface CalendarEvent {
   date: string;      // "YYYY-MM-DD"
@@ -43,7 +44,7 @@ export function buildEventCalendar(
     events.push({
       date,
       daysAway: dayDiff(todayISO, date),
-      label: top.title,
+      label: displayTitle(top),
       category: top.category,
       count: ms.length,
       volume: ms.reduce((s, m) => s + (m.volume || 0), 0),
