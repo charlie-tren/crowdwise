@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { fetchKalshiMarkets, fetchPolymarketMarkets } from "./sources";
 import { isMacroRelevant } from "./categorise";
 import { CATEGORIES } from "./taxonomy";
@@ -5,7 +6,14 @@ import type { Market } from "./types";
 
 const LIVE_STATUSES = new Set(["active", "open", ""]);
 
-export async function fetchTopMarkets(includeKalshi = true, includePolymarket = true): Promise<Market[]> {
+// Memoised per request (React cache): the market detail route calls this from
+// BOTH generateMetadata and the page body, and other pages/routes call it too.
+// Without this each caller did a separate live Kalshi+Polymarket fetch, which is
+// wasteful and, worse, non-deterministic - the two market-page calls could
+// disagree on whether a market exists, so the <title> fell back to the generic
+// "Market" while the page rendered fine. cache() degrades to a plain call outside
+// a request scope (unit tests), so per-call mocking still works.
+export const fetchTopMarkets = cache(async (includeKalshi = true, includePolymarket = true): Promise<Market[]> => {
   const records: Market[] = [];
   if (includeKalshi) {
     try { records.push(...(await fetchKalshiMarkets())); }
@@ -37,7 +45,7 @@ export async function fetchTopMarkets(includeKalshi = true, includePolymarket = 
   });
   out.sort((a, b) => (b.volume || 0) - (a.volume || 0));
   return out;
-}
+});
 
 export function groupByCategory(records: Market[], perCategory?: number): Record<string, Market[]> {
   const grouped: Record<string, Market[]> = {};
