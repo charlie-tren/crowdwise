@@ -12,8 +12,11 @@ export async function GET(
 ) {
   const { token } = await params;
   const url = new URL(req.url);
-  const days = Number(url.searchParams.get("days") ?? 90);
-  const fidelity = Number(url.searchParams.get("fidelity") ?? 1440);
-  const points = await fetchPolymarketMarketHistory(decodeURIComponent(token), { days, fidelity });
+  // interval=max returns the market's full available history regardless of age;
+  // these markets are often only days old, and an explicit start/end window that
+  // predates the first trade makes the CLOB return nothing.
+  const interval = url.searchParams.get("interval") ?? "max";
+  const fidelity = Number(url.searchParams.get("fidelity") ?? 60);
+  const points = await fetchPolymarketMarketHistory(decodeURIComponent(token), { interval, fidelity });
   return NextResponse.json({ points });
 }

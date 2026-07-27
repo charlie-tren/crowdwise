@@ -137,4 +137,11 @@ describe("fetchPolymarketMarketHistory (mocked seam)", () => {
     setHttpGetJson(async () => { throw new Error("blocked"); });
     expect(await fetchPolymarketMarketHistory("tok", { nowTs: 1735800000 })).toEqual([]);
   });
+  it("interval mode sends `interval` and omits the startTs/endTs window", async () => {
+    let seen: Record<string, unknown> | undefined;
+    setHttpGetJson(async (_url, params) => { seen = params as Record<string, unknown>; return { history: [] }; });
+    await fetchPolymarketMarketHistory("tok", { interval: "max", fidelity: 60 });
+    expect(seen).toEqual({ market: "tok", interval: "max", fidelity: 60 });
+    expect(seen).not.toHaveProperty("startTs");
+  });
 });

@@ -132,21 +132,25 @@ export async function fetchKalshiMarketHistory(
 // the conditionId does NOT work here. Returns [iso, prob] pairs oldest-first.
 // Best-effort: empty on missing id, error, or empty history (mirrors the Kalshi
 // candlestick fetcher). fidelity is the bar width in minutes.
+//
+// Two query modes: pass `interval` ("max" | "1m" | "1w" | "1d" | "6h" | "1h") to
+// get all available history for that lookback - use this for markets whose age is
+// unknown, because a startTs BEFORE the market's first trade makes the CLOB return
+// an EMPTY set rather than clamping. Omit `interval` to use an explicit `days`
+// window - fine only when there's known history that far back (e.g. 7d sparklines).
 export async function fetchPolymarketMarketHistory(
   tokenId: string,
-  opts: { days?: number; fidelity?: number; nowTs?: number } = {},
+  opts: { days?: number; fidelity?: number; nowTs?: number; interval?: string } = {},
 ): Promise<HistoryPoint[]> {
   if (!tokenId) return [];
-  const { days = 90, fidelity = 60, nowTs } = opts;
+  const { days = 90, fidelity = 60, nowTs, interval } = opts;
   const end = Math.floor(nowTs ?? Date.now() / 1000);
-  const start = end - days * 24 * 3600;
+  const params: Record<string, string | number> = interval
+    ? { market: tokenId, interval, fidelity }
+    : { market: tokenId, startTs: end - days * 24 * 3600, endTs: end, fidelity };
   let data: any;
   try {
-    data = await _httpGetJson(
-      `${POLYMARKET_CLOB_BASE}/prices-history`,
-      { market: tokenId, startTs: start, endTs: end, fidelity },
-      8000,
-    );
+    data = await _httpGetJson(`${POLYMARKET_CLOB_BASE}/prices-history`, params, 8000);
   } catch {
     return [];
   }
