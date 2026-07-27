@@ -305,6 +305,20 @@ describe("displayTitle", () => {
     ).toBe("Fed funds <3.00% after the Dec 2026 meeting");
   });
 
+  it("cleans open-ended '50+ bps' magnitude markets", () => {
+    expect(
+      displayTitle(m({ title: "Will the Fed increase interest rates by 50+ bps after the July 2026 meeting?", endDate: "2026-07-29" })),
+    ).toBe("Fed hikes 50+bps after the Jul 2026 meeting");
+    expect(
+      displayTitle(m({ title: "Will the Fed decrease interest rates by 50+ bps after the July 2026 meeting?", endDate: "2026-07-29" })),
+    ).toBe("Fed cuts 50+bps after the Jul 2026 meeting");
+  });
+
+  it("leaves multi-meeting combo markets as their descriptive title", () => {
+    const title = "Will the Fed Pause-Pause-Pause in the next three decisions (Apr-Jun-Jul)?";
+    expect(displayTitle(m({ title }))).toBe(title);
+  });
+
   it("passes a non-Fed title through unchanged", () => {
     const title = "US recession called in 2026";
     expect(displayTitle(m({ category: "Growth/Recession", title }))).toBe(title);

@@ -56,14 +56,28 @@ function fedRateLevelTitle(m: Market): string | null {
   return `Fed funds ${dir}${mt[2]}% after the ${shortLabel(m.endDate.slice(0, 7))} meeting`;
 }
 
+// Open-ended magnitude markets ("Will the Fed increase interest rates by 50+ bps
+// after the July 2026 meeting?") aren't caught by parseFedProposition - its bps
+// regex wants "50bps", not "50+ bps" - so clean them HERE rather than widening
+// the shared parser, which also drives cross-venue matching and the Fed
+// distribution (real blast radius for a cosmetic gain).
+function fedMagnitudeTitle(m: Market): string | null {
+  if (!m.endDate || m.category !== "Rates/Fed") return null;
+  if (!/\bfed(?:eral reserve)?\b/i.test(m.title)) return null;
+  const mt = m.title.match(/\b(increase|raise|hike|decrease|lower|cut)s?\b[^?]*?\bby\s+([\d.]+)\+\s*bps/i);
+  if (!mt) return null;
+  const verb = /increase|raise|hike/i.test(mt[1]) ? "hikes" : "cuts";
+  return `Fed ${verb} ${mt[2]}+bps after the ${shortLabel(m.endDate.slice(0, 7))} meeting`;
+}
+
 // A clean, human display title for any market: canonical Fed phrasing where the
-// title is a parseable Fed decision or rate-level market, otherwise the raw
-// title untouched. Used wherever a market title is shown (board, cards, ladder)
-// so the awkward Kalshi long-form phrasing never reaches the user.
+// title is a parseable Fed decision, rate-level, or open-ended magnitude market,
+// otherwise the raw title untouched. Used wherever a market title is shown
+// (board, cards, ladder) so the awkward Kalshi long-form never reaches the user.
 export function displayTitle(m: Market): string {
   const fed = parseFedProposition(m);
   if (fed) return fedTileTitle(fed);
-  return fedRateLevelTitle(m) ?? m.title;
+  return fedRateLevelTitle(m) ?? fedMagnitudeTitle(m) ?? m.title;
 }
 
 // The Rates/Fed headline tile, derived from the SAME Kalshi Fed distribution as
