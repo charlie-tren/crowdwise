@@ -47,10 +47,18 @@ export function Nav() {
           </Link>
         );
       })}
-      <span className="ml-auto flex items-center gap-2 text-[13px] text-muted">
-        <span className="h-1.5 w-1.5 animate-softpulse rounded-full bg-accent" />
-        Live
-      </span>
+      <div className="ml-auto flex items-center gap-3">
+        <a
+          href="https://charlie-tren.github.io/"
+          className="rounded-full border border-white/10 px-2.5 py-1 text-[12px] text-muted transition-colors hover:border-white/25 hover:text-[var(--text)]"
+        >
+          More from Charlie ↗
+        </a>
+        <span className="flex items-center gap-2 text-[13px] text-muted">
+          <span className="h-1.5 w-1.5 animate-softpulse rounded-full bg-accent" />
+          Live
+        </span>
+      </div>
     </nav>
   );
 }
