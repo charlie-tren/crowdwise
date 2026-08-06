@@ -18,8 +18,8 @@ function horizon(m: Market): string {
 }
 
 // Dense, scannable table: one row per market (theme chip, title + venue, a blue
-// probability meter, volume, resolution horizon, 7d trend). Probability uses the
-// single-hue blue magnitude ramp; green/red is reserved for 7d direction only.
+// probability meter, volume, resolution horizon, 30d trend). Probability uses the
+// single-hue blue magnitude ramp; green/red is reserved for trend direction only.
 export function BoardTable({
   markets, moves, sparks,
 }: {
@@ -37,7 +37,7 @@ export function BoardTable({
             <th scope="col" className="py-2 pr-3 font-medium">Probability</th>
             <th scope="col" className="py-2 pr-3 text-right font-medium">Volume</th>
             <th scope="col" className="py-2 pr-3 font-medium">Resolves</th>
-            <th scope="col" className="py-2 pr-3 text-right font-medium">7d</th>
+            <th scope="col" className="py-2 pr-3 text-right font-medium">30d</th>
           </tr>
         </thead>
         <tbody>

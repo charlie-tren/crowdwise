@@ -4,12 +4,15 @@ import { buildSparklines } from "@/lib/sparklines";
 import { fetchKalshiMarketHistory, fetchPolymarketMarketHistory } from "@/lib/sources";
 import type { Market } from "@/lib/types";
 
-// Dispatch a market to the right 7d price-history source: Kalshi candlesticks or
-// Polymarket CLOB price history.
-function fetchHistory7d(m: Market) {
+// Dispatch a market to its ~30-day price-history source for the board trend
+// sparkline. Kalshi: 30d of daily candles. Polymarket: interval=1m (last month
+// of available history) rather than a 30d start/end window - a fixed window that
+// predates a young market's first trade makes the CLOB return NOTHING, so an
+// interval lookback (clamped to the market's age) is what fills newer markets.
+function fetchHistoryTrend(m: Market) {
   return m.platform === "Polymarket"
-    ? fetchPolymarketMarketHistory(m.clobTokenId ?? "", { days: 7, fidelity: 60 })
-    : fetchKalshiMarketHistory(m.series, m.id, { days: 7, periodInterval: 60 });
+    ? fetchPolymarketMarketHistory(m.clobTokenId ?? "", { interval: "1m", fidelity: 720 })
+    : fetchKalshiMarketHistory(m.series, m.id, { days: 30, periodInterval: 1440 });
 }
 
 // 7-day card sparklines for the whole default board. Cached (10 min) and fetched
@@ -26,7 +29,7 @@ export async function GET() {
     // (representativeByEvent), so the returned ids match the rendered card ids.
     const data = await buildSparklines(
       representativeByEvent(markets),
-      fetchHistory7d,
+      fetchHistoryTrend,
       { maxMarkets: 250 },
     );
     return NextResponse.json(data);
