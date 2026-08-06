@@ -49,7 +49,7 @@ export function Nav() {
       })}
       <div className="ml-auto flex items-center gap-3">
         <a
-          href="https://charlie-tren.github.io/"
+          href="https://charlietrenorden.com/"
           className="rounded-full border border-white/10 px-2.5 py-1 text-[12px] text-muted transition-colors hover:border-white/25 hover:text-[var(--text)]"
         >
           Other Projects ↗
