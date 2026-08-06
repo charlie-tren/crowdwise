@@ -64,6 +64,21 @@ describe("buildSparklines", () => {
     expect(fetched.filter((id) => id.startsWith("KX")).length).toBe(2); // 2 Kalshi - NOT starved despite far lower volume
   });
 
+  it("never exceeds the concurrency limit yet fetches every candidate", async () => {
+    const markets = Array.from({ length: 30 }, (_, i) => m({ id: `KX-${i}`, volume: (i + 1) * 10 }));
+    let inFlight = 0, peak = 0;
+    const fetched: string[] = [];
+    await buildSparklines(markets, async (mkt) => {
+      inFlight += 1; peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight -= 1;
+      fetched.push(mkt.id);
+      return pts([0.1, 0.2, 0.3]);
+    }, { maxMarkets: 250, concurrency: 4 });
+    expect(peak).toBeLessThanOrEqual(4);
+    expect(fetched.length).toBe(30); // all covered despite the throttle
+  });
+
   it("downsamples a long series to the requested point count", async () => {
     const long = Array.from({ length: 100 }, (_, i) => i / 100);
     const out = await buildSparklines([m({ id: "KX-A" })], async () => pts(long), { points: 10 });

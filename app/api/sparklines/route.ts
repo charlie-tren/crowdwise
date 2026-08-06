@@ -12,9 +12,12 @@ function fetchHistory7d(m: Market) {
     : fetchKalshiMarketHistory(m.series, m.id, { days: 7, periodInterval: 60 });
 }
 
-// 7-day card sparklines for the top Kalshi markets by volume. Bounded + cached
-// (10 min) so public traffic doesn't hammer Kalshi's candlestick API.
+// 7-day card sparklines for the whole default board. Cached (10 min) and fetched
+// with a bounded concurrency pool (see buildSparklines) so covering every row
+// doesn't hammer the Kalshi/Polymarket history APIs. maxMarkets sits above the
+// representative board size (~130) so no visible row is left without a sparkline.
 export const revalidate = 600;
+export const maxDuration = 60;
 
 export async function GET() {
   try {
@@ -24,7 +27,7 @@ export async function GET() {
     const data = await buildSparklines(
       representativeByEvent(markets),
       fetchHistory7d,
-      { maxMarkets: 40 },
+      { maxMarkets: 250 },
     );
     return NextResponse.json(data);
   } catch (err) {
