@@ -59,13 +59,14 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
 
 ## Older backlog (pre-existing)
 - **B8 [DONE] BoardTable click-sortable columns** - shipped (commit d6e9772), verified on prod.
-- **[BUG, AUTO-ish] Valid market links occasionally 404.** `fetchTopMarkets` returns a slightly
-  different top-set per request, and the market page finds a market by filtering that set - so a
-  link built from one request's set can 404 against a later request's set. React `cache()` only
-  dedupes *within* a request. Fix: give the market page a stable single-market lookup - read the
-  KV board (`boardStore`, already persisted by the cron) instead of a fresh live fetch, or add a
-  fetch-market-by-id path. Surfaced 2026-08-07 while verifying the OG cards; pre-existing, not
-  caused by them. Also causes those pages to fall back to the generic (root) OG card.
+- **[DONE] Valid market links occasionally 404** (commit b78549c). `fetchTopMarkets` returns a
+  slightly different volume-ranked top-set per request and the market page found its market by
+  filtering that set, so a link valid when generated could 404 later (and then serve the generic
+  OG card). Fixed with `fetchMarketById` in `lib/sources.ts` - a deterministic per-venue lookup
+  (Kalshi `/markets/<ticker>`, Polymarket gamma `condition_ids`) used as a fallback in the page,
+  its `generateMetadata`, and the OG image route. NOT built on KV: there is **no `vercel.json`
+  and no cron configured in prod**, so the KV board is not reliably populated - don't assume
+  `boardStore` has data. Verified on prod: deep-in-the-list markets 200, bogus ids still 404.
 - Non-Fed verbose titles (WTI oil strikes, jobs, GDP, geopolitics) left deliberately - no
   clean universal transform; only Fed titles are canonicalised (`displayTitle`). WON'T-DO.
 - Dormant Metaculus integration (`lib/metaculus.ts`) - BLOCKED, revisit only if access opens.
