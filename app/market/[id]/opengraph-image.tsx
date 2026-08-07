@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { fetchTopMarkets } from "@/lib/board";
+import { fetchMarketById } from "@/lib/sources";
 import { displayTitle } from "@/lib/highlights";
 import { THEME_COLOURS } from "@/lib/themeColours";
 import { probFill } from "@/lib/format";
@@ -24,7 +25,9 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const id = decodeURIComponent(raw);
   let market = null;
   try {
-    market = (await fetchTopMarkets()).find((x) => x.id === id) ?? null;
+    // Same by-id fallback as the page: the top-set shifts between requests, so
+    // don't serve the generic card for a market that really exists.
+    market = (await fetchTopMarkets()).find((x) => x.id === id) ?? (await fetchMarketById(id));
   } catch {
     /* fall back to the generic card */
   }

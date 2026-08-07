@@ -166,3 +166,31 @@ export async function fetchPolymarketMarketHistory(
   out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
   return out;
 }
+
+// Fetch ONE market directly by its id, independent of the volume-ranked top-set.
+// The board's top-set shifts slightly between requests (venue volume ordering +
+// transient per-series failures), so finding a market by filtering a fresh
+// fetchTopMarkets() call can 404 a link that was valid when it was generated.
+// A by-id lookup is deterministic. Kalshi ids are tickers (KXFED-26JUL-H0);
+// Polymarket ids are 0x-prefixed condition ids. Returns null when not found or
+// on any error, so callers can still fall back to the top-set.
+export async function fetchMarketById(id: string): Promise<Market | null> {
+  const key = id.trim();
+  if (!key) return null;
+  const isPolymarket = key.startsWith("0x");
+  try {
+    if (isPolymarket) {
+      const data = await _httpGetJson(`${POLYMARKET_BASE}/markets`, { condition_ids: key, limit: 1 });
+      const raw = polymarketItems(data)[0];
+      if (!raw) return null;
+      const m = normalisePolymarketMarket(raw);
+      return m.id ? m : null;
+    }
+    const data = await _httpGetJson(`${KALSHI_BASE}/markets/${encodeURIComponent(key)}`);
+    const raw = data?.market ?? data;
+    if (!raw?.ticker) return null;
+    return normaliseKalshiMarket(raw as Record<string, any>);
+  } catch {
+    return null;
+  }
+}

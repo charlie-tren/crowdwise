@@ -1,7 +1,17 @@
 import { notFound } from "next/navigation";
 import { MarketDetail } from "@/components/MarketDetail";
 import { fetchTopMarkets, representativeByEvent } from "@/lib/board";
+import { fetchMarketById } from "@/lib/sources";
 import { displayTitle } from "@/lib/highlights";
+import type { Market } from "@/lib/types";
+
+// Resolve one market for this route. The volume-ranked top-set shifts slightly
+// between requests, so a link that was valid when generated can be missing from a
+// later fetch - fall back to a deterministic by-id lookup rather than 404ing a
+// real market (which also made the page serve the generic OG card).
+async function findMarket(id: string, markets: Market[]): Promise<Market | null> {
+  return markets.find((x) => x.id === id) ?? (await fetchMarketById(id));
+}
 
 export const revalidate = 300;
 export const maxDuration = 60;
@@ -10,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId);
   const markets = await fetchTopMarkets();
-  const m = markets.find((x) => x.id === id);
+  const m = await findMarket(id, markets);
   if (!m) return { title: "Market · Crowdwise" };
   return { title: `${displayTitle(m).slice(0, 60)} · Crowdwise` };
 }
@@ -19,7 +29,7 @@ export default async function MarketPage({ params }: { params: Promise<{ id: str
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId);
   const markets = await fetchTopMarkets();
-  const m = markets.find((x) => x.id === id);
+  const m = await findMarket(id, markets);
   if (!m) notFound();
   const related = representativeByEvent(markets)
     .filter((r) => r.category === m.category && r.id !== m.id)

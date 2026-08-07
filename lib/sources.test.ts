@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
   fetchKalshiMarkets, fetchPolymarketMarkets, fetchKalshiMarketHistory,
-  fetchPolymarketMarketHistory, setHttpGetJson, resetHttpGetJson,
+  fetchPolymarketMarketHistory, fetchMarketById, setHttpGetJson, resetHttpGetJson,
 } from "./sources";
 
 afterEach(() => resetHttpGetJson());
@@ -143,5 +143,44 @@ describe("fetchPolymarketMarketHistory (mocked seam)", () => {
     await fetchPolymarketMarketHistory("tok", { interval: "max", fidelity: 60 });
     expect(seen).toEqual({ market: "tok", interval: "max", fidelity: 60 });
     expect(seen).not.toHaveProperty("startTs");
+  });
+});
+
+describe("fetchMarketById (mocked seam)", () => {
+  it("looks up a Kalshi ticker via /markets/<ticker> and normalises it", async () => {
+    let seenUrl = "";
+    setHttpGetJson(async (url) => {
+      seenUrl = url;
+      return { market: { ticker: "KXFED-26JUL-H0", title: "Fed thing?", last_price_dollars: "0.77", volume_fp: "5", status: "active" } };
+    });
+    const m = await fetchMarketById("KXFED-26JUL-H0");
+    expect(seenUrl).toContain("/markets/KXFED-26JUL-H0");
+    expect(m?.platform).toBe("Kalshi");
+    expect(m?.id).toBe("KXFED-26JUL-H0");
+  });
+
+  it("looks up a Polymarket 0x condition id via the gamma markets query", async () => {
+    let seenParams: Record<string, unknown> | undefined;
+    setHttpGetJson(async (_url, params) => {
+      seenParams = params as Record<string, unknown>;
+      return [{ conditionId: "0xabc", question: "US recession in 2026?", outcomePrices: '["0.42","0.58"]', active: true }];
+    });
+    const m = await fetchMarketById("0xabc");
+    expect(seenParams?.condition_ids).toBe("0xabc");
+    expect(m?.platform).toBe("Polymarket");
+    expect(m?.prob).toBeCloseTo(0.42);
+  });
+
+  it("null on empty id (no fetch), on not-found, and on error", async () => {
+    let called = false;
+    setHttpGetJson(async () => { called = true; return {}; });
+    expect(await fetchMarketById("")).toBeNull();
+    expect(called).toBe(false);
+    setHttpGetJson(async () => ({}));                                  // no market in payload
+    expect(await fetchMarketById("KXFED-X")).toBeNull();
+    setHttpGetJson(async () => []);                                    // empty gamma result
+    expect(await fetchMarketById("0xnope")).toBeNull();
+    setHttpGetJson(async () => { throw new Error("boom"); });
+    expect(await fetchMarketById("KXFED-X")).toBeNull();
   });
 });
