@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { BoardFilters, type Filters } from "./BoardFilters";
-import { BoardTable } from "./BoardTable";
+import { BoardTable, type SortKey, type SortState } from "./BoardTable";
 import { MarketCard } from "./MarketCard";
 import { CATEGORIES } from "@/lib/taxonomy";
 import { representativeByEvent, groupByWindow } from "@/lib/board";
@@ -11,6 +11,12 @@ export function BoardView({ initial }: { initial: BoardPayload }) {
   const [view, setView] = useState<"table" | "cards">("table");
   const [spark, setSpark] = useState<{ sparks: Record<string, number[]>; moves: Record<string, number> } | null>(null);
   const [showLong, setShowLong] = useState(false);
+  // Sort applies WITHIN each resolution window (windows stay the primary axis).
+  // Default (key: null) keeps the volume-desc order groupByWindow produces.
+  const [sort, setSort] = useState<SortState>({ key: null, dir: "desc" });
+  const DEFAULT_DIR: Record<SortKey, "asc" | "desc"> = { prob: "desc", volume: "desc", resolves: "asc", move: "desc" };
+  const toggleSort = (key: SortKey) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: DEFAULT_DIR[key] }));
 
   useEffect(() => {
     let cancelled = false;
@@ -89,7 +95,7 @@ export function BoardView({ initial }: { initial: BoardPayload }) {
               )}
             </div>
             {!collapsed && (view === "table" ? (
-              <BoardTable markets={w.markets} moves={moves} sparks={sparks} />
+              <BoardTable markets={w.markets} moves={moves} sparks={sparks} sort={sort} onSort={toggleSort} />
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {w.markets.map((m) => (

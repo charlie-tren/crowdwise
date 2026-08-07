@@ -17,31 +17,88 @@ function horizon(m: Market): string {
   return `in ${Math.round(d / 30)}mo`;
 }
 
+export type SortKey = "prob" | "volume" | "resolves" | "move";
+export interface SortState { key: SortKey | null; dir: "asc" | "desc" }
+
+// Value a row sorts by for each key; null (no value) always sinks to the bottom
+// regardless of direction, so unpriced / undated / no-history rows don't intrude.
+const SORT_VALUE: Record<SortKey, (m: Market, moves: Record<string, number>) => number | null> = {
+  prob: (m) => m.prob ?? null,
+  volume: (m) => m.volume ?? null,
+  resolves: (m) => daysTo(m.endDate),
+  move: (m, moves) => (m.id in moves ? moves[m.id] : null),
+};
+
+export function sortMarkets(markets: Market[], moves: Record<string, number>, sort: SortState): Market[] {
+  if (!sort.key) return markets; // default: keep the incoming (volume-desc) order
+  const get = SORT_VALUE[sort.key];
+  const sign = sort.dir === "asc" ? 1 : -1;
+  return [...markets].sort((a, b) => {
+    const va = get(a, moves);
+    const vb = get(b, moves);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    return (va - vb) * sign;
+  });
+}
+
 // Dense, scannable table: one row per market (theme chip, title + venue, a blue
 // probability meter, volume, resolution horizon, 30d trend). Probability uses the
 // single-hue blue magnitude ramp; green/red is reserved for trend direction only.
+// A sortable column header: click to sort, click again to flip. Non-sortable
+// columns (Theme, Market) render as plain labels.
+function SortTh({
+  label, sortKey, sort, onSort, align,
+}: {
+  label: string;
+  sortKey?: SortKey;
+  sort?: SortState;
+  onSort?: (k: SortKey) => void;
+  align?: "right";
+}) {
+  const cls = `py-2 pr-3 font-medium ${align === "right" ? "text-right" : ""}`;
+  if (!sortKey || !onSort) return <th scope="col" className={cls}>{label}</th>;
+  const active = sort?.key === sortKey;
+  const arrow = active ? (sort!.dir === "asc" ? " ▲" : " ▼") : "";
+  return (
+    <th scope="col" className={cls}>
+      <button
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center uppercase tracking-[0.06em] transition-colors hover:text-[var(--text)] ${active ? "text-[var(--text)]" : ""}`}
+        aria-sort={active ? (sort!.dir === "asc" ? "ascending" : "descending") : "none"}
+      >
+        {label}{arrow}
+      </button>
+    </th>
+  );
+}
+
 export function BoardTable({
-  markets, moves, sparks,
+  markets, moves, sparks, sort, onSort,
 }: {
   markets: Market[];
   moves: Record<string, number>;
   sparks?: Record<string, number[]>;
+  sort?: SortState;
+  onSort?: (k: SortKey) => void;
 }) {
+  const rows = sort ? sortMarkets(markets, moves, sort) : markets;
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] border-collapse text-sm">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-[0.06em] text-[var(--muted-dim)]">
-            <th scope="col" className="py-2 pr-3 font-medium">Theme</th>
-            <th scope="col" className="py-2 pr-3 font-medium">Market</th>
-            <th scope="col" className="py-2 pr-3 font-medium">Probability</th>
-            <th scope="col" className="py-2 pr-3 text-right font-medium">Volume</th>
-            <th scope="col" className="py-2 pr-3 font-medium">Resolves</th>
-            <th scope="col" className="py-2 pr-3 text-right font-medium">30d</th>
+            <SortTh label="Theme" />
+            <SortTh label="Market" />
+            <SortTh label="Probability" sortKey="prob" sort={sort} onSort={onSort} />
+            <SortTh label="Volume" sortKey="volume" sort={sort} onSort={onSort} align="right" />
+            <SortTh label="Resolves" sortKey="resolves" sort={sort} onSort={onSort} />
+            <SortTh label="30d" sortKey="move" sort={sort} onSort={onSort} align="right" />
           </tr>
         </thead>
         <tbody>
-          {markets.map((m) => {
+          {rows.map((m) => {
             const mv = moves[m.id];
             const sp = sparks?.[m.id];
             const colour = THEME_COLOURS[m.category] ?? "#4c9be8";
