@@ -20,29 +20,36 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
   holding email + per-user preferences.
 - A subscribe UI (on-site box, single opt-in) and an unsubscribe path.
 
-## Backlog (priority order)
+## Easiest AUTO wins (no accounts/secrets/external services, no subjective calls - I can build + verify end-to-end)
+- **B1 Shareable OG market cards** (backlog #4) - pure code (Next.js `ImageResponse`), high promo value. Best first build.
+- **B8 BoardTable click-sortable columns** (older backlog) - pure code, small.
+- Semi-auto (buildable but need one input/decision from Charlie): #7 disagreement homepage hook (a layout choice), #3 crowd-vs-consensus *Fed-dots slice* (public SEP data, but confirm the source).
+- NEEDS Charlie (external setup / consequential / data-source decision): #1 digest, #2 alerts (Brevo secrets + opt-in to actually send + subscribe flow), #5 calibration (needs an outcome-capture pipeline - snapshots store odds, not resolutions), #6 calendar (pick a calendar data feed).
 
-1. **[P1] Digest email - "what the crowd repriced this week"** (DO FIRST). Weekly push
-   (start weekly, maybe daily later) summarising the biggest odds moves + notable
-   crowd-vs-Fed / cross-venue gaps. Uses stored snapshots + movers. The habit-former
-   that turns a pull dashboard into a push product.
-2. **[P1] Threshold move-alerts, user-subscribable.** User picks markets/themes + a move
-   threshold (e.g. Fed-cut odds move >=10pp) and a delivery channel. **Inbox (email) is
-   the primary channel** - users choose to have alerts delivered to their inbox; Teams /
-   Slack webhook optional. Diff the precomputed movers against each user's thresholds.
-3. **[P2] Crowd vs consensus.** Put prediction-market odds next to economist consensus /
-   Fed dots / futures - the "who's right" framing, which is the core pitch. The Atlanta-Fed
-   futures overlay already exists (`FedPathOverlay`); extend it to consensus / the dot plot.
-4. **[P2] Shareable market cards.** A clean OG image per market / per distribution so links
-   unfurl well on X/Slack and others spread them - promotion baked into the product.
-5. **[P2] Track record / calibration page - "was the crowd right?"** Use the stored
-   snapshots vs realised outcomes to show the crowd's calibration over time. Trust +
-   repeat draw. (History is already being persisted, so the data exists.)
-6. **[P3] Macro calendar tie-in.** Annotate what MOVED the odds (a CPI print, an FOMC
-   statement) so a jump in the chart carries its narrative.
-7. **[P3] Disagreement as the through-line.** Lean the whole product on crowd-vs-Fed /
-   cross-venue disagreement (overlay + cross-venue page already built) - make it the
-   homepage hook, not a buried sub-page.
+## Backlog (priority = value x reach / effort; AUTO tag = can I do it unattended)
+
+1. **[P1 · NEEDS-YOU] Digest email - "what the crowd repriced this week"** (highest value).
+   Weekly push summarising the biggest odds moves + crowd-vs-Fed / cross-venue gaps. Uses
+   stored snapshots + movers. Habit-former. *Blocked on: Brevo secrets, your opt-in to send,
+   a subscribe UI decision.*
+2. **[P1 · NEEDS-YOU] Threshold move-alerts, user-subscribable.** User picks markets/themes +
+   a threshold (e.g. Fed-cut odds move >=10pp) + delivery channel. **Inbox (email) primary** -
+   users opt to have alerts delivered to their inbox; Teams/Slack webhook optional. Diffs the
+   precomputed movers. *Blocked on: subscriber store + prefs UI + Brevo + you approving sends.*
+3. **[P2 · AUTO win up front, SEMI after] Crowd vs consensus.** Odds vs economist consensus /
+   Fed dots / futures - the "who's right" framing, the core pitch. Futures overlay already
+   exists (`FedPathOverlay`); the **Fed dot-plot (SEP) slice is public + buildable now**;
+   economist consensus needs a source decision.
+4. **[P2 · AUTO] Shareable market cards.** A clean OG image per market / distribution so links
+   unfurl on X/Slack and others spread them - promotion baked in. **Easiest high-ROI auto win.**
+5. **[P2 · SEMI/NEEDS-DATA] Track record / calibration - "was the crowd right?"** Snapshots vs
+   realised outcomes over time. History (odds) is already persisted, but resolutions aren't -
+   needs an outcome-capture step first.
+6. **[P3 · NEEDS-SOURCE] Macro calendar tie-in.** Annotate what MOVED the odds (CPI, FOMC) so a
+   jump carries its narrative. Needs an economic-calendar data feed.
+7. **[P3 · SEMI-AUTO] Disagreement as the through-line.** Make crowd-vs-Fed / cross-venue
+   disagreement the homepage hook, not a sub-page (overlay + cross-venue page already built).
+   Buildable now, but the homepage layout is a taste call - show options first.
 
 ## Promotion (growth plan, not code)
 - Daily macro chart on X/FinTwit (Fed-path-vs-crowd, or the widest cross-venue gap)
@@ -51,9 +58,9 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
   LinkedIn / the personal hub for the professional angle.
 
 ## Older backlog (pre-existing)
+- **B8 [AUTO] BoardTable click-sortable columns** - pure code, small, unattended-buildable.
 - Non-Fed verbose titles (WTI oil strikes, jobs, GDP, geopolitics) left deliberately - no
-  clean universal transform; only Fed titles are canonicalised (`displayTitle`).
-- BoardTable click-sortable columns.
-- Dormant Metaculus integration (`lib/metaculus.ts`) - revisit only if access opens.
+  clean universal transform; only Fed titles are canonicalised (`displayTitle`). WON'T-DO.
+- Dormant Metaculus integration (`lib/metaculus.ts`) - BLOCKED, revisit only if access opens.
 - ~30 board rows show no trend sparkline: genuinely brand-new markets with <3 points of
-  history even over 30d - by design, don't "fix" by faking a line.
+  history even over 30d - BY DESIGN, don't "fix" by faking a line.
