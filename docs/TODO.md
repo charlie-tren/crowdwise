@@ -7,11 +7,18 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
 (a daily chart on FinTwit linking back) + an owned email channel, not a launch.
 
 ## Existing building blocks (reuse these - don't rebuild)
-- **KV store** (`lib/kv.ts` / `lib/kvClient.ts`): already persists the board, up to
-  ~200 historical **snapshots**, and precomputed **movers**. → snapshots give the
-  calibration/track-record history for free; movers give the alert deltas for free.
-- **Cron route** (`app/api/cron/refresh`, `CRON_SECRET`-protected): the pattern for a
-  scheduled send job already exists - add a sibling route, mind the Vercel Hobby cron cap.
+- **KV store** (`lib/kv.ts` / `lib/kvClient.ts`): the CODE to persist the board, ~200
+  historical **snapshots** and precomputed **movers** exists and is wired to
+  `@vercel/kv`. **CORRECTED 2026-08-07: do NOT assume it holds data.** There is no
+  `vercel.json` and no cron configured (only `.github/workflows/ci.yml`), so nothing
+  invokes `/api/cron/refresh` in prod - the KV is very likely empty and every route
+  falls through to its live-fetch fallback. So the calibration history and alert
+  deltas are **not** available for free yet: standing up the scheduled refresh (and
+  confirming KV env vars are set) is a prerequisite for items 1, 2 and 5.
+- **Cron route** (`app/api/cron/refresh`, `CRON_SECRET`-protected): the code pattern for
+  a scheduled job exists but is **not scheduled**. Needs a `vercel.json` `crons` entry
+  (mind the Vercel Hobby cap: 1/day) or an external trigger (a GitHub Actions cron
+  hitting the URL with the secret is the cheaper, more flexible option).
 - **Email**: Brevo (already used for One Story / The Aftertimes - single opt-in,
   authenticated domain). See [[html-email-gotchas]] and [[brevo-api-gotchas]].
 
@@ -21,8 +28,11 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
 - A subscribe UI (on-site box, single opt-in) and an unsubscribe path.
 
 ## Easiest AUTO wins (no accounts/secrets/external services, no subjective calls - I can build + verify end-to-end)
-- **B1 Shareable OG market cards** (backlog #4) - pure code (Next.js `ImageResponse`), high promo value. Best first build.
-- **B8 BoardTable click-sortable columns** (older backlog) - pure code, small.
+- ~~**B1 Shareable OG market cards**~~ **DONE** 2026-08-07 (d6e9772) - verified on prod.
+- ~~**B8 BoardTable click-sortable columns**~~ **DONE** 2026-08-07 (d6e9772) - verified on prod.
+- Remaining auto candidate: **stand up the scheduled board refresh** (GitHub Actions cron →
+  `/api/cron/refresh` with `CRON_SECRET`) - unblocks the KV-dependent items below. Needs the
+  secret set, so semi-auto.
 - Semi-auto (buildable but need one input/decision from Charlie): #7 disagreement homepage hook (a layout choice), #3 crowd-vs-consensus *Fed-dots slice* (public SEP data, but confirm the source).
 - NEEDS Charlie (external setup / consequential / data-source decision): #1 digest, #2 alerts (Brevo secrets + opt-in to actually send + subscribe flow), #5 calibration (needs an outcome-capture pipeline - snapshots store odds, not resolutions), #6 calendar (pick a calendar data feed).
 
@@ -40,11 +50,14 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
    Fed dots / futures - the "who's right" framing, the core pitch. Futures overlay already
    exists (`FedPathOverlay`); the **Fed dot-plot (SEP) slice is public + buildable now**;
    economist consensus needs a source decision.
-4. **[P2 · AUTO] Shareable market cards.** A clean OG image per market / distribution so links
-   unfurl on X/Slack and others spread them - promotion baked in. **Easiest high-ROI auto win.**
-5. **[P2 · SEMI/NEEDS-DATA] Track record / calibration - "was the crowd right?"** Snapshots vs
-   realised outcomes over time. History (odds) is already persisted, but resolutions aren't -
-   needs an outcome-capture step first.
+4. **[DONE 2026-08-07 · d6e9772] Shareable market cards.** Per-market + site OG images
+   (`app/market/[id]/opengraph-image.tsx`, `app/opengraph-image.tsx`, `next/og`). Market links
+   now unfurl as a branded card carrying the odds. Verified on prod (1200x630 PNGs, per-market
+   `og:image` + `twitter:image`); falls back to the site card for a 404/unknown id.
+5. **[P2 · NEEDS-DATA] Track record / calibration - "was the crowd right?"** Snapshots vs
+   realised outcomes over time. **Two prerequisites, not one:** (a) the scheduled refresh must
+   actually run so snapshots accumulate (see the corrected KV note above - it isn't running),
+   and (b) resolutions/outcomes aren't captured at all, so an outcome-capture step is needed.
 6. **[P3 · NEEDS-SOURCE] Macro calendar tie-in.** Annotate what MOVED the odds (CPI, FOMC) so a
    jump carries its narrative. Needs an economic-calendar data feed.
 7. **[P3 · SEMI-AUTO] Disagreement as the through-line.** Make crowd-vs-Fed / cross-venue
