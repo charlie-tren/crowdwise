@@ -4,7 +4,7 @@ import { ImageResponse } from "next/og";
 export const runtime = "nodejs";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "Crowdwise - the crowd's odds on macro events";
+export const alt = "Crowdwise - live prediction-market odds on the Fed, inflation, recession and oil";
 
 const BG = "#0e1117";
 const TEXT = "#fafafa";
@@ -19,8 +19,8 @@ export default function Image() {
           <div style={{ width: 26, height: 26, borderRadius: 26, background: ACCENT, marginRight: 18 }} />
           <div style={{ fontSize: 44, fontWeight: 600, letterSpacing: -0.5 }}>Crowdwise</div>
         </div>
-        <div style={{ fontSize: 76, fontWeight: 700, letterSpacing: -2, lineHeight: 1.1, maxWidth: 1000 }}>The crowd&apos;s odds on macro events</div>
-        <div style={{ fontSize: 30, color: MUTED, marginTop: 28 }}>Live implied probabilities from the Kalshi &amp; Polymarket prediction markets - the Fed path, recession, inflation, oil.</div>
+        <div style={{ fontSize: 76, fontWeight: 700, letterSpacing: -2, lineHeight: 1.1, maxWidth: 1000 }}>Live odds on the Fed, inflation, recession and oil</div>
+        <div style={{ fontSize: 30, color: MUTED, marginTop: 28 }}>Priced by real money on the Kalshi &amp; Polymarket prediction markets.</div>
       </div>
     ),
     { ...size },

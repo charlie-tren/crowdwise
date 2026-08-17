@@ -32,7 +32,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     /* fall back to the generic card */
   }
 
-  const title = market ? displayTitle(market) : "The crowd's odds on macro events";
+  const title = market ? displayTitle(market) : "Live odds on the Fed, inflation, recession and oil";
   const prob = market?.prob ?? null;
   const colour = market ? THEME_COLOURS[market.category] ?? ACCENT : ACCENT;
 
@@ -67,7 +67,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           ) : null}
         </div>
 
-        <div style={{ fontSize: 24, color: MUTED }}>crowdwise-live.vercel.app · the crowd&apos;s odds on macro events</div>
+        <div style={{ fontSize: 24, color: MUTED }}>crowdwise-live.vercel.app · prediction-market odds on macro events</div>
       </div>
     ),
     { ...size },
