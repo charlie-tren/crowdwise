@@ -52,7 +52,7 @@ export function Nav() {
           href="https://charlietrenorden.com/"
           className="rounded-full border border-white/10 px-2.5 py-1 text-[12px] text-muted transition-colors hover:border-white/25 hover:text-[var(--text)]"
         >
-          Other Projects ↗
+          <span aria-hidden="true">←</span>&nbsp;Other projects
         </a>
         <span className="flex items-center gap-2 text-[13px] text-muted">
           <span className="h-1.5 w-1.5 animate-softpulse rounded-full bg-accent" />
