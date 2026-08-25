@@ -61,7 +61,7 @@ export default async function HomePage() {
     <>
       <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Crowdwise</h1>
       <p className="mb-6 text-sm text-muted">
-        Live prediction-market odds on the Fed, inflation, recession and oil - priced by real money on Kalshi and Polymarket.
+        Live odds on macro events - Fed decisions, inflation, recessions - from Kalshi and Polymarket.
       </p>
 
       {board.markets.length === 0 ? (

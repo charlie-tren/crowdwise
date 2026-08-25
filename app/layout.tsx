@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Crowdwise",
-  description: "Live prediction-market odds on the Fed, inflation, recession and oil - priced by real money on Kalshi and Polymarket.",
+  description: "Live odds on macro events - Fed decisions, inflation, recessions - from Kalshi and Polymarket.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
