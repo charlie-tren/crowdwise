@@ -55,6 +55,29 @@ describe("computeTopMovers", () => {
     expect(out.map((x) => x.id)).toEqual(["flaky"]);
   });
 
+  it("dedupes on the caller's key BEFORE the topN cut, so the panel stays full", async () => {
+    // a and b collapse to one label; c and d are distinct. topN 2 must return
+    // the survivor of a/b plus c, NOT a/b's survivor plus a hole.
+    const markets = [m("a", 100), m("b", 99), m("c", 98), m("d", 97)];
+    const hist: Record<string, HistoryPoint[]> = {
+      a: pts(0.5, 0.90), // +0.40 biggest
+      b: pts(0.5, 0.80), // +0.30, same label as a -> dropped
+      c: pts(0.5, 0.70), // +0.20
+      d: pts(0.5, 0.60), // +0.10
+    };
+    const label: Record<string, string> = { a: "Fed holds", b: "Fed holds", c: "Fed hikes", d: "Fed cuts" };
+    const out = await computeTopMovers(markets, async (mk) => hist[mk.id] ?? [], {
+      topN: 2, retries: 0, dedupeKey: (mk) => label[mk.id],
+    });
+    expect(out.map((x) => x.id)).toEqual(["a", "c"]);
+  });
+
+  it("keeps every row when no dedupe key is given", async () => {
+    const markets = [m("a", 100), m("b", 99)];
+    const out = await computeTopMovers(markets, async () => pts(0.5, 0.9), { retries: 0 });
+    expect(out).toHaveLength(2);
+  });
+
   it("a failing fetch is skipped, not fatal", async () => {
     const markets = [m("ok", 100), m("bad", 90)];
     const out = await computeTopMovers(markets, async (mk) => {

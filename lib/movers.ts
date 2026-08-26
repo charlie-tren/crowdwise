@@ -26,11 +26,12 @@ export async function computeTopMovers(
   opts: {
     maxMarkets?: number; topN?: number; minMove?: number;
     concurrency?: number; gapMs?: number; retries?: number;
+    dedupeKey?: (m: Market) => string;
   } = {},
 ): Promise<Mover[]> {
   const {
     maxMarkets = 40, topN = 12, minMove = 0.005,
-    concurrency = 4, gapMs = 0, retries = 1,
+    concurrency = 4, gapMs = 0, retries = 1, dedupeKey,
   } = opts;
 
   const cands = markets
@@ -41,14 +42,15 @@ export async function computeTopMovers(
   // An empty series and a throttled one look identical here (the fetchers
   // swallow HTTP errors), so a market that comes back with nothing gets one
   // more go after a pause before we accept that it has no history.
-  const moveOf = async (m: Market): Promise<Mover | null> => {
+  type Scored = { mover: Mover; market: Market };
+  const moveOf = async (m: Market): Promise<Scored | null> => {
     for (let attempt = 0; attempt <= retries; attempt++) {
       if (attempt > 0) await sleep(500 * attempt);
       try {
         const mv = historyMove(await fetchHistory(m));
         if (mv != null) {
           return Math.abs(mv) >= minMove
-            ? { id: m.id, title: m.title, category: m.category, move: mv }
+            ? { mover: { id: m.id, title: m.title, category: m.category, move: mv }, market: m }
             : null;
         }
       } catch { /* transient or rate-limited - fall through to the retry */ }
@@ -56,8 +58,25 @@ export async function computeTopMovers(
     return null;
   };
 
-  const scored = await mapLimit(cands, concurrency, gapMs, moveOf);
-  const movers = scored.filter((x): x is Mover => x !== null);
-  movers.sort((a, b) => Math.abs(b.move) - Math.abs(a.move));
-  return movers.slice(0, topN);
+  const scored = (await mapLimit(cands, concurrency, gapMs, moveOf))
+    .filter((x): x is Scored => x !== null);
+  scored.sort((a, b) => Math.abs(b.mover.move) - Math.abs(a.mover.move));
+
+  // Dedupe BEFORE the topN cut. The board carries the same proposition on more
+  // than one series ("...no change in Fed interest rates..." and "...Hike rates
+  // by 0bps..." are one row once shortened), and collapsing them after the cut
+  // would shrink the panel rather than promote the next real mover up into it.
+  // Sorted by size first, so the biggest move of a duplicate group survives.
+  const seen = new Set<string>();
+  const out: Mover[] = [];
+  for (const { mover, market } of scored) {
+    if (dedupeKey) {
+      const k = dedupeKey(market);
+      if (seen.has(k)) continue;
+      seen.add(k);
+    }
+    out.push(mover);
+    if (out.length >= topN) break;
+  }
+  return out;
 }

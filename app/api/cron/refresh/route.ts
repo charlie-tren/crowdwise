@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { fetchTopMarkets } from "@/lib/board";
 import { boardStore } from "@/lib/kvClient";
 import { computeTopMovers } from "@/lib/movers";
+import { displayTitle } from "@/lib/highlights";
 import { fetchKalshiMarketHistory, fetchPolymarketMarketHistory } from "@/lib/sources";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function GET(req: Request) {
       (m) => m.platform === "Polymarket"
         ? fetchPolymarketMarketHistory(m.clobTokenId ?? "", { days: 7, fidelity: 60 })
         : fetchKalshiMarketHistory(m.series, m.id, { days: 7, periodInterval: 60 }),
-      { maxMarkets: 40 },
+      { maxMarkets: 40, dedupeKey: displayTitle },
     );
     await boardStore.writeMovers(movers);
   } catch (err) {
