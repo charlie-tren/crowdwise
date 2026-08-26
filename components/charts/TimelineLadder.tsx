@@ -16,6 +16,12 @@ const TICKS = 5;
 // implied probability. Reads left-to-right as a tenor ladder (the same mental
 // model as a debt-maturity or rate-path chart) rather than a bubble cloud, and
 // vertical stacking avoids the near-term pile-up that plagued the scatter.
+//
+// Below `sm` the shared axis is dropped rather than squeezed: five date ticks
+// collide inside a ~140px track, and a track that narrow puts every marker in
+// the same place, so it costs the market names their room and returns nothing.
+// The phone layout spends that width on the name and prints each row's own
+// resolution date instead - the rows are still in date order either way.
 export function TimelineLadder({ markets }: { markets: Market[] }) {
   const router = useRouter();
   const rows = markets
@@ -41,8 +47,8 @@ export function TimelineLadder({ markets }: { markets: Market[] }) {
 
   return (
     <div role="img" aria-label="Maturity ladder of market resolution dates versus implied probability">
-      {/* axis */}
-      <div className="grid grid-cols-[130px_1fr] items-center border-b border-white/[0.06] pb-2 sm:grid-cols-[260px_1fr]">
+      {/* axis - desktop only, see the note above */}
+      <div className="hidden grid-cols-[minmax(0,26rem)_1fr] items-center border-b border-white/[0.06] pb-2 sm:grid">
         <div />
         <div className="relative h-4">
           {ticks.map((t, i) => {
@@ -66,17 +72,36 @@ export function TimelineLadder({ markets }: { markets: Market[] }) {
         const pos = posOf(r.ms);
         const flip = pos > 60; // put label left of the dot near the right edge
         const size = dotPx(r.volume || 0);
+        const pct = `${((r.prob as number) * 100).toFixed(0)}%`;
         return (
           <div
             key={r.id}
             onClick={() => router.push("/market/" + encodeURIComponent(r.id))}
-            className="grid cursor-pointer grid-cols-[130px_1fr] items-center border-b border-white/[0.06] py-1.5 transition-colors hover:bg-white/[0.02] sm:grid-cols-[260px_1fr]"
+            className="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center border-b border-white/[0.06] py-1.5 transition-colors hover:bg-white/[0.02] sm:grid-cols-[minmax(0,26rem)_1fr]"
+            title={r.title}
           >
-            <div className="flex items-center gap-2 pr-3">
-              <span className="h-2 w-2 flex-none rounded-full" style={{ background: colour }} />
-              <span className="truncate text-[12.5px] text-[var(--text)]">{displayTitle(r)}</span>
+            <div className="flex items-start gap-2 pr-3 sm:pr-4">
+              <span className="mt-[5px] h-2 w-2 flex-none rounded-full" style={{ background: colour }} />
+              {/* Wraps rather than truncating: a clipped question is not a market
+                  the reader can name. Two lines is enough at the desktop column
+                  width; on a phone the name takes whatever it needs. */}
+              <span className="text-[12.5px] leading-snug text-[var(--text)] sm:line-clamp-2">
+                {displayTitle(r)}
+              </span>
             </div>
-            <div className="relative h-6">
+
+            {/* phone: the row's own resolution date, no shared axis */}
+            <div className="flex items-center gap-2 justify-self-end sm:hidden">
+              <span className="text-[10.5px] tabular-nums text-[var(--muted-dim)]">{axisLabel(r.ms)}</span>
+              <span
+                className="flex-none rounded-full"
+                style={{ width: size, height: size, background: colour, boxShadow: `0 0 0 3px ${colour}22` }}
+              />
+              <span className="w-9 text-right text-[12px] font-semibold tabular-nums text-[var(--text)]">{pct}</span>
+            </div>
+
+            {/* desktop: the marker on the shared time axis */}
+            <div className="relative hidden h-6 sm:block">
               <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/[0.05]" />
               <div
                 className={"absolute top-1/2 flex -translate-y-1/2 items-center gap-2 whitespace-nowrap" + (flip ? " -translate-x-full flex-row-reverse" : "")}
@@ -86,9 +111,7 @@ export function TimelineLadder({ markets }: { markets: Market[] }) {
                   className="flex-none rounded-full"
                   style={{ width: size, height: size, background: colour, boxShadow: `0 0 0 3px ${colour}22` }}
                 />
-                <span className="text-[12px] font-semibold tabular-nums text-[var(--text)]">
-                  {((r.prob as number) * 100).toFixed(0)}%
-                </span>
+                <span className="text-[12px] font-semibold tabular-nums text-[var(--text)]">{pct}</span>
               </div>
             </div>
           </div>
