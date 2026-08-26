@@ -66,7 +66,7 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
 
 ## Found 2026-08-26 (from the chart-legibility pass)
 
-8. **[DONE 2026-08-26 · fe66bc0 + 55e0f8f] Duplicate-looking timeline rows.** The
+8. **[DONE 2026-08-26 · fe66bc0 + e8e44f1] Duplicate-looking timeline rows.** The
    original diagnosis below was WRONG on two counts, both corrected by enumerating every
    raw-vs-rendered title on the live board rather than reading the visible case:
    (a) the collisions are **cross-venue** (Kalshi vs Polymarket), not two Kalshi series,
