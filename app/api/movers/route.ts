@@ -5,6 +5,12 @@ import { computeTopMovers } from "@/lib/movers";
 import { fetchKalshiMarketHistory, fetchPolymarketMarketHistory } from "@/lib/sources";
 
 export const revalidate = 600;
+// A regeneration fetches price history for up to 40 markets. Measured at ~6-7s
+// locally with Polymarket unreachable, so longer from a US region where it is:
+// past the 10s default this route would be killed mid-flight and the chart would
+// come back empty. Matches /api/sparklines, which does the same kind of work.
+// The 600s ISR window means visitors are served the stale copy meanwhile.
+export const maxDuration = 60;
 
 export async function GET() {
   try {
