@@ -57,6 +57,9 @@ describe("parseFedProposition", () => {
       ym: "2026-07",
       action: "cut",
       bps: -1,
+      // Carried for display only; `bps` stays -1 so the proposition key, and so
+      // cross-venue matching, is unchanged.
+      openEndedFromBps: 25,
     });
   });
 

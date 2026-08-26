@@ -6,6 +6,15 @@ export interface FedProposition {
   ym: string; // meeting year-month "YYYY-MM" (from endDate)
   action: FedAction;
   bps: number; // basis points; 0 for hold; parsed number (25, 50); -1 for ">N" open-ended buckets
+  /**
+   * The N in a ">N bps" bucket. DISPLAY ONLY - deliberately kept out of `bps`
+   * and therefore out of the proposition key, so cross-venue matching is
+   * unchanged. Without it every open-ended bucket rendered as "Fed hikes at the
+   * Sep 2026 meeting", which reads as "does the Fed hike at all" when the market
+   * is actually "does it hike by MORE than 25bps" - a different question, and it
+   * sat on the timeline directly beside the exact-25bps market.
+   */
+  openEndedFromBps?: number;
 }
 
 // A canonical, venue-agnostic proposition. Two markets on different venues match
@@ -45,7 +54,16 @@ function normalizeBpsPhrasing(title: string): string {
   );
 }
 
-const BPS_RE = /(>|more than|at least)?\s*(\d+(?:\.\d+)?)bps/i;
+// A qualifier that NARROWS a Fed proposition in a way none of the canonical
+// phrasings model. Canonicalising past one of these mislabels the market:
+// "Fed emergency rate cut before 2027?" rendered as "Fed cuts rates before 2027",
+// a far broader claim, and sat on the timeline beside the real any-cut market
+// priced 6.6pp away, so the pair read as one row duplicated with a pricing bug.
+// When we cannot say it faithfully, keep the venue's own wording.
+export const UNMODELLED_FED_QUALIFIER =
+  /\b(emergency|unscheduled|inter-?meeting|off-cycle|surprise|consecutive)\b/i;
+
+const BPS_RE =/(>|more than|at least)?\s*(\d+(?:\.\d+)?)bps/i;
 
 function actionLabel(action: FedAction): string {
   return action.charAt(0).toUpperCase() + action.slice(1);
@@ -70,6 +88,9 @@ export function parseFedProposition(m: Market): FedProposition | null {
   // distribution.
   if (!/federal reserve|federal funds|\bfomc\b|\bfed\b/.test(normalized)) return null;
   if (/\becb\b|european central|bank of (japan|england|russia|canada)|\bboj\b|\bboe\b/.test(normalized)) return null;
+  // An emergency / intermeeting move is not the scheduled decision, so it must not
+  // share a proposition key with one or feed the meeting distribution.
+  if (UNMODELLED_FED_QUALIFIER.test(normalized)) return null;
 
   const isHold = normalized.includes("no change") || /\b0bps\b/.test(normalized);
 
@@ -98,12 +119,14 @@ export function parseFedProposition(m: Market): FedProposition | null {
   const isOpenEnded = Boolean(bpsMatch[1]);
   const bps = isOpenEnded ? -1 : Number(bpsMatch[2]);
 
-  return { ym, action, bps };
+  return isOpenEnded
+    ? { ym, action, bps, openEndedFromBps: Number(bpsMatch[2]) }
+    : { ym, action, bps };
 }
 
-function makeFedLabel(ym: string, action: FedAction, bps: number): string {
+function makeFedLabel(ym: string, action: FedAction, bps: number, fromBps?: number): string {
   if (action === "hold") return `Hold at the ${ym} meeting`;
-  if (bps === -1) return `${actionLabel(action)} >… at the ${ym} meeting`;
+  if (bps === -1) return `${actionLabel(action)} >${fromBps ?? "…"}bps at the ${ym} meeting`;
   return `${actionLabel(action)} ${bps}bps at the ${ym} meeting`;
 }
 
@@ -113,7 +136,7 @@ function fedProposition(m: Market): Proposition | null {
   return {
     type: "fed",
     key: `fed|${fed.ym}|${fed.action}|${fed.bps}`,
-    label: makeFedLabel(fed.ym, fed.action, fed.bps),
+    label: makeFedLabel(fed.ym, fed.action, fed.bps, fed.openEndedFromBps),
     ym: fed.ym,
     action: fed.action,
     bps: fed.bps,

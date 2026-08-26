@@ -1,5 +1,5 @@
 import type { Category } from "./taxonomy";
-import { parseFedProposition, type FedAction, type FedProposition } from "./crossVenue";
+import { parseFedProposition, UNMODELLED_FED_QUALIFIER, type FedAction, type FedProposition } from "./crossVenue";
 import type { Market } from "./types";
 
 // ---- Headline odds tiles ---------------------------------------------------
@@ -39,7 +39,11 @@ function fedTileTitle(fed: FedProposition): string {
   const when = shortLabel(fed.ym); // "Jul 2026"
   if (fed.action === "hold") return `Fed holds at the ${when} meeting`;
   const verb = fed.action === "hike" ? "hikes" : "cuts";
-  if (fed.bps === -1) return `Fed ${verb} at the ${when} meeting`;
+  if (fed.bps === -1) {
+    return fed.openEndedFromBps != null
+      ? `Fed ${verb} >${fed.openEndedFromBps}bps at the ${when} meeting`
+      : `Fed ${verb} at the ${when} meeting`;
+  }
   return `Fed ${verb} ${fed.bps}bps at the ${when} meeting`;
 }
 
@@ -66,6 +70,7 @@ function fedFallbackTitle(m: Market): string | null {
   const t = m.title;
   if (!/\bfed(?:eral reserve)?\b/i.test(t)) return null;
   if (/\becb\b|european central|bank of (japan|england|canada|russia)|\bboj\b|\bboe\b/i.test(t)) return null;
+  if (UNMODELLED_FED_QUALIFIER.test(t)) return null; // see the constant's note
   const when = m.endDate ? shortLabel(m.endDate.slice(0, 7)) : titleMeetingLabel(t);
   let mt: RegExpMatchArray | null;
 
