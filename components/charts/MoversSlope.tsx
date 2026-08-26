@@ -1,5 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { THEME_COLOURS } from "@/lib/themeColours";
 
 export interface MoverBar { id: string; title: string; category: string; move: number; }
 /** A mover augmented with its current implied probability (0..1). */
@@ -9,7 +10,6 @@ export interface SlopeMover extends MoverBar { now: number; }
 const UP = "#3fb27f";
 const DOWN = "#e0714f";
 
-const truncate = (s: string, n = 52) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const pctLabel = (x: number) => `${Math.round(clamp01(x) * 100)}%`;
 const ppLabel = (v: number) => `${v >= 0 ? "+" : "-"}${Math.abs(v * 100).toFixed(1)}pp`;
@@ -42,6 +42,7 @@ export function MoversSlope({ movers }: { movers: SlopeMover[] }) {
         {movers.map((m) => {
           const up = m.move >= 0;
           const colour = up ? UP : DOWN;
+          const theme = THEME_COLOURS[m.category] ?? "#4c9be8";
           const now = clamp01(m.now);
           const was = clamp01(m.now - m.move);
           const lo = Math.min(was, now);
@@ -52,11 +53,19 @@ export function MoversSlope({ movers }: { movers: SlopeMover[] }) {
               <button
                 type="button"
                 onClick={() => router.push("/market/" + encodeURIComponent(m.id))}
-                className="grid w-full grid-cols-[minmax(0,1fr)] items-center gap-x-4 gap-y-1.5 py-3 text-left transition-colors hover:bg-white/[0.03] sm:grid-cols-[minmax(0,15rem)_1fr_auto]"
-                title={`${m.title}\n${pctLabel(was)} -> ${pctLabel(now)} (${ppLabel(m.move)})`}
+                className="grid w-full grid-cols-[minmax(0,1fr)] items-center gap-x-5 gap-y-1.5 py-3 text-left transition-colors hover:bg-white/[0.03] sm:grid-cols-[minmax(0,24rem)_1fr_auto]"
+                title={`${m.title}\n${m.category} · ${pctLabel(was)} -> ${pctLabel(now)} (${ppLabel(m.move)})`}
               >
-                {/* Title */}
-                <span className="truncate text-[13px] text-[var(--text)]">{truncate(m.title)}</span>
+                {/* Title. Wraps to a second line rather than truncating - these are
+                    questions, and a clipped question is not a market anyone can name. */}
+                <span className="flex items-start gap-2 text-[13px] leading-snug text-[var(--text)]">
+                  <span
+                    className="mt-[5px] h-2 w-2 flex-none rounded-full"
+                    style={{ background: theme }}
+                    aria-hidden="true"
+                  />
+                  <span className="line-clamp-2">{m.title}</span>
+                </span>
 
                 {/* Dumbbell track */}
                 <span className="relative block h-5 w-full" aria-hidden="true">

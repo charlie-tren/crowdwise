@@ -6,6 +6,7 @@ import { MarketTreemap } from "./charts/MarketTreemap";
 import { ConvictionScatter } from "./charts/ConvictionScatter";
 import { MoversSlope, type MoverBar, type SlopeMover } from "./charts/MoversSlope";
 import { UncertaintyGauge } from "./UncertaintyGauge";
+import { displayTitle } from "@/lib/highlights";
 import type { Market } from "@/lib/types";
 
 const TREEMAP_LIMIT = 45;
@@ -16,20 +17,31 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
   const scatterData = useMemo(() => buildScatter(reps), [reps]);
   const [movers, setMovers] = useState<MoverBar[] | null>(null);
 
-  // Current implied prob per market id, so each mover's "now" comes from the live board
-  // (was = now - move).
-  const probById = useMemo(() => {
-    const map = new Map<string, number | null>();
-    for (const m of markets) map.set(m.id, m.prob);
+  // The live board keyed by id: each mover takes its "now" (was = now - move) and
+  // its label from there, so the row carries the same shortened Fed wording the
+  // timeline and tiles use rather than the raw venue question.
+  const byId = useMemo(() => {
+    const map = new Map<string, Market>();
+    for (const m of markets) map.set(m.id, m);
     return map;
   }, [markets]);
 
   const slopeMovers = useMemo<SlopeMover[] | null>(() => {
     if (movers === null) return null;
-    return movers
-      .map((mv) => ({ ...mv, now: probById.get(mv.id) ?? null }))
-      .filter((mv): mv is SlopeMover => mv.now !== null);
-  }, [movers, probById]);
+    // The board carries the same proposition on more than one Kalshi series, and
+    // displayTitle collapses those to one label - so without this the chart shows
+    // "Fed holds at the Sep 2026 meeting" twice with two slightly different moves,
+    // which reads as a bug. Movers arrive sorted by size, so the first wins.
+    const seen = new Set<string>();
+    return movers.flatMap((mv) => {
+      const live = byId.get(mv.id);
+      if (!live || live.prob == null) return [];
+      const title = displayTitle(live);
+      if (seen.has(title)) return [];
+      seen.add(title);
+      return [{ ...mv, title, now: live.prob }];
+    });
+  }, [movers, byId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,9 +81,9 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
       <hr className="my-8 border-white/10" />
 
       <h2 className="mb-1 text-lg font-medium">Conviction scatter</h2>
-      <p className="mb-2 text-sm text-muted">
-        Implied probability (x) vs volume (y, log scale), one dot per market coloured by theme. Markets sitting
-        high-volume near the dashed 50% line are genuinely contested.
+      <p className="mb-3 text-sm text-muted">
+        Most macro markets are priced near a yes or a no. The ones sitting high in the middle band are where real
+        money disagrees.
       </p>
       <ConvictionScatter points={scatterData} />
 
@@ -79,7 +91,7 @@ export function MarketMapView({ markets }: { markets: Market[] }) {
 
       <h2 className="mb-1 text-lg font-medium">Top movers (7 days)</h2>
       <p className="mb-2 text-sm text-muted">
-        Biggest probability moves over the past week, from Kalshi price history.
+        Biggest probability moves over the past week, from Kalshi and Polymarket price history.
       </p>
       {slopeMovers === null ? (
         <p className="text-sm text-muted">Loading movers...</p>

@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { computeTopMovers } from "./movers";
+import { computeTopMovers, hasHistorySource } from "./movers";
 import type { Market, HistoryPoint } from "./types";
 
-const m = (id: string, vol: number, plat: "Kalshi" | "Polymarket" = "Kalshi", series = "KX"): Market => ({
+const m = (
+  id: string, vol: number, plat: "Kalshi" | "Polymarket" = "Kalshi",
+  series = "KX", clobTokenId?: string,
+): Market => ({
   id, platform: plat, title: `t-${id}`, category: "Rates/Fed", prob: 0.5, volume: vol,
-  endDate: "2026-12-31", status: "active", series, event: "",
+  endDate: "2026-12-31", status: "active", series, event: "", clobTokenId,
 });
 
 const pts = (first: number, last: number): HistoryPoint[] => [["2026-06-01", first], ["2026-06-08", last]];
@@ -13,30 +16,72 @@ describe("computeTopMovers", () => {
   it("ranks by absolute move, caps topN, skips tiny moves", async () => {
     const markets = [m("a", 100), m("b", 90), m("c", 80), m("d", 70)];
     const hist: Record<string, HistoryPoint[]> = {
-      a: pts(0.5, 0.55),   // +0.05
-      b: pts(0.5, 0.20),   // -0.30 (biggest)
-      c: pts(0.5, 0.5005), // +0.0005 -> below minMove, dropped
-      d: pts(0.5, 0.60),   // +0.10
+      a: pts(0.5, 0.55),  // +0.05
+      b: pts(0.5, 0.20),  // -0.30 (biggest)
+      c: pts(0.5, 0.502), // +0.002 -> below minMove, dropped
+      d: pts(0.5, 0.60),  // +0.10
     };
-    const out = await computeTopMovers(markets, async (_s, id) => hist[id] ?? [], { topN: 2 });
-    // fetchHistory receives the market id (e.g. "b"), not the title
+    const out = await computeTopMovers(markets, async (mk) => hist[mk.id] ?? [], { topN: 2, retries: 0 });
     expect(out.map((x) => x.id)).toEqual(["b", "d"]); // |0.30| > |0.10|
     expect(out[0].move).toBeCloseTo(-0.30);
   });
 
-  it("only considers Kalshi markets with a series", async () => {
-    const markets = [m("k", 100), m("p", 999, "Polymarket", ""), m("noseries", 500, "Kalshi", "")];
+  it("scores Polymarket markets too, not just Kalshi", async () => {
+    const markets = [m("k", 100), m("p", 999, "Polymarket", "", "tok-p")];
     const seen: string[] = [];
-    await computeTopMovers(markets, async (_s, id) => { seen.push(id); return pts(0.4, 0.6); });
-    expect(seen).toEqual(["k"]); // only the Kalshi-with-series market was fetched
+    const out = await computeTopMovers(markets, async (mk) => { seen.push(mk.id); return pts(0.4, 0.6); });
+    expect(seen.sort()).toEqual(["k", "p"]);
+    expect(out.map((x) => x.id)).toEqual(["p", "k"]); // ordered by volume-driven equal move -> stable by input order
+  });
+
+  it("skips markets with no route to price history", async () => {
+    const markets = [
+      m("k", 100),
+      m("no-token", 999, "Polymarket", ""),  // Polymarket without a CLOB token id
+      m("no-series", 500, "Kalshi", ""),     // Kalshi without a series ticker
+    ];
+    const seen: string[] = [];
+    await computeTopMovers(markets, async (mk) => { seen.push(mk.id); return pts(0.4, 0.6); });
+    expect(seen).toEqual(["k"]);
+  });
+
+  it("retries a market that comes back empty, then keeps it", async () => {
+    let calls = 0;
+    const out = await computeTopMovers([m("flaky", 100)], async () => {
+      calls += 1;
+      return calls === 1 ? [] : pts(0.3, 0.5); // first call throttled -> []
+    });
+    expect(calls).toBe(2);
+    expect(out.map((x) => x.id)).toEqual(["flaky"]);
   });
 
   it("a failing fetch is skipped, not fatal", async () => {
     const markets = [m("ok", 100), m("bad", 90)];
-    const out = await computeTopMovers(markets, async (_s, id) => {
-      if (id === "bad") throw new Error("boom");
+    const out = await computeTopMovers(markets, async (mk) => {
+      if (mk.id === "bad") throw new Error("boom");
       return pts(0.3, 0.5);
-    });
+    }, { retries: 0 });
     expect(out.map((x) => x.id)).toEqual(["ok"]);
+  });
+
+  it("respects the concurrency ceiling", async () => {
+    const markets = Array.from({ length: 12 }, (_, i) => m(`m${i}`, 100 - i));
+    let inFlight = 0, peak = 0;
+    await computeTopMovers(markets, async () => {
+      inFlight += 1; peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight -= 1;
+      return pts(0.3, 0.5);
+    }, { concurrency: 3, retries: 0 });
+    expect(peak).toBeLessThanOrEqual(3);
+  });
+});
+
+describe("hasHistorySource", () => {
+  it("requires a series for Kalshi and a CLOB token for Polymarket", () => {
+    expect(hasHistorySource(m("a", 1))).toBe(true);
+    expect(hasHistorySource(m("a", 1, "Kalshi", ""))).toBe(false);
+    expect(hasHistorySource(m("a", 1, "Polymarket", "", "tok"))).toBe(true);
+    expect(hasHistorySource(m("a", 1, "Polymarket", ""))).toBe(false);
   });
 });

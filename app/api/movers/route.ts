@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { boardStore } from "@/lib/kvClient";
 import { fetchTopMarkets } from "@/lib/board";
 import { computeTopMovers } from "@/lib/movers";
-import { fetchKalshiMarketHistory } from "@/lib/sources";
+import { fetchKalshiMarketHistory, fetchPolymarketMarketHistory } from "@/lib/sources";
 
 export const revalidate = 600;
 
@@ -13,12 +13,20 @@ export async function GET() {
   } catch (err) {
     console.warn("movers KV read failed", err);
   }
-  // Fallback: compute on demand from the current board (bounded to 20 markets).
+  // Fallback: compute on demand from the current board. Both venues are in play
+  // and the fetches are throttled inside computeTopMovers, so a wider candidate
+  // pool costs wall-clock rather than 429s.
   try {
     let markets;
     try { markets = (await boardStore.readBoard())?.markets; } catch { /* ignore */ }
     if (!markets) markets = await fetchTopMarkets();
-    const movers = await computeTopMovers(markets, (s, t) => fetchKalshiMarketHistory(s, t, { days: 7, periodInterval: 60 }), { maxMarkets: 20 });
+    const movers = await computeTopMovers(
+      markets,
+      (m) => m.platform === "Polymarket"
+        ? fetchPolymarketMarketHistory(m.clobTokenId ?? "", { days: 7, fidelity: 60 })
+        : fetchKalshiMarketHistory(m.series, m.id, { days: 7, periodInterval: 60 }),
+      { maxMarkets: 40 },
+    );
     return NextResponse.json({ movers });
   } catch (err) {
     console.warn("movers compute failed", err);
