@@ -45,6 +45,18 @@ export function TimelineLadder({ markets }: { markets: Market[] }) {
 
   const ticks = Array.from({ length: TICKS }, (_, i) => domainMin + (range * i) / (TICKS - 1));
 
+  // Kalshi and Polymarket both list some propositions, and once shortened the two
+  // rows carry the same label at two different prices, which reads as a bug. It
+  // is not: that gap is the cross-venue spread, and it is the thing this site
+  // exists to show, so the rows stay and the venue is named on them instead. Only
+  // the colliding ones get the tag - putting a venue on all 125 rows would be
+  // noise to answer a question only these few raise.
+  const labelCounts = new Map<string, number>();
+  for (const r of rows) {
+    const k = displayTitle(r);
+    labelCounts.set(k, (labelCounts.get(k) ?? 0) + 1);
+  }
+
   return (
     <div role="img" aria-label="Maturity ladder of market resolution dates versus implied probability">
       {/* axis - desktop only, see the note above */}
@@ -73,6 +85,8 @@ export function TimelineLadder({ markets }: { markets: Market[] }) {
         const flip = pos > 60; // put label left of the dot near the right edge
         const size = dotPx(r.volume || 0);
         const pct = `${((r.prob as number) * 100).toFixed(0)}%`;
+        const label = displayTitle(r);
+        const shared = (labelCounts.get(label) ?? 0) > 1;
         return (
           <div
             key={r.id}
@@ -86,7 +100,12 @@ export function TimelineLadder({ markets }: { markets: Market[] }) {
                   the reader can name. Two lines is enough at the desktop column
                   width; on a phone the name takes whatever it needs. */}
               <span className="text-[12.5px] leading-snug text-[var(--text)] sm:line-clamp-2">
-                {displayTitle(r)}
+                {label}
+                {shared && (
+                  <span className="ml-1.5 whitespace-nowrap rounded border border-white/10 px-1 py-px align-[1px] text-[10px] text-[var(--muted-dim)]">
+                    {r.platform}
+                  </span>
+                )}
               </span>
             </div>
 
