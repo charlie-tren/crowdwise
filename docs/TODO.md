@@ -64,6 +64,27 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
    disagreement the homepage hook, not a sub-page (overlay + cross-venue page already built).
    Buildable now, but the homepage layout is a taste call - show options first.
 
+## Found 2026-08-26 (from the chart-legibility pass)
+
+8. **[P2 · AUTO] The board carries the same proposition on more than one series.** Two
+   Kalshi series can both ask "does the Fed hold in September", so the timeline shows
+   genuine near-duplicates ("Fed cuts rates before 2027" at 8% and again at 13%, the same
+   `displayTitle` from two tickers with different pricing). The movers panel now dedupes
+   on `displayTitle` before its topN cut (commit 8d84cd2), but the timeline and the board
+   do not, and `representativeByEvent` does not catch it because the pair sit under
+   different events. Decide whether the right answer is a wider dedupe key, or showing
+   both with the venue/series named so the difference reads as information rather than as
+   a bug. NOTE this is real data, not a rendering fault: the two tickers really are priced
+   apart, which is arguably the interesting bit.
+
+9. **[P3 · AUTO] Give each top-movers row its 7-day sparkline.** `/api/movers` already
+   fetches the full history series per market and then throws everything away except the
+   net move, so the shape is free apart from payload size. A dumbbell says where it
+   started and finished; a sparkline says whether it drifted or jumped, which is the
+   question a mover actually raises. `components/charts/Sparkline.tsx` already exists and
+   is used by the board. Costs a wider `/api/movers` response, so check the payload before
+   committing to it.
+
 ## Promotion (growth plan, not code)
 - Daily macro chart on X/FinTwit (Fed-path-vs-crowd, or the widest cross-venue gap)
   linking back - the flywheel; the tool's own visuals are the marketing.
