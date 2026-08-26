@@ -1,6 +1,7 @@
 import { normaliseKalshiMarket, normalisePolymarketMarket } from "./normalise";
 import { KALSHI_MACRO_SERIES } from "./taxonomy";
 import { candleProb, clampProb } from "./parse";
+import { mapLimit, withRetry } from "./throttle";
 import type { Category } from "./taxonomy";
 import type { Market, HistoryPoint } from "./types";
 
@@ -40,21 +41,26 @@ export async function fetchKalshiSeriesMarkets(
   return raw.map((m: Record<string, any>) => normaliseKalshiMarket(m, category));
 }
 
+// Kalshi rate-limits: firing all ~18 series at once reliably 429s a handful of
+// them, and because a failed series is skipped rather than fatal the board just
+// comes back short - which on the home page showed up as the whole Fed section
+// silently missing. Throttled + retried, the board is complete instead.
+export const KALSHI_SERIES_CONCURRENCY = 4;
+
 export async function fetchKalshiMarkets(
   series: Record<string, Category> = KALSHI_MACRO_SERIES, status = "open",
 ): Promise<Market[]> {
   const entries = Object.entries(series);
-  const results = await Promise.allSettled(
-    entries.map(([seriesTicker, theme]) => fetchKalshiSeriesMarkets(seriesTicker, theme, status)),
-  );
-  const out: Market[] = [];
-  results.forEach((res, i) => {
-    if (res.status === "fulfilled") {
-      out.push(...res.value);
-    } else {
-      console.warn(`Kalshi series ${entries[i][0]} fetch failed`, res.reason);
+  const results = await mapLimit(entries, KALSHI_SERIES_CONCURRENCY, 60, async ([seriesTicker, theme]) => {
+    try {
+      return await withRetry(() => fetchKalshiSeriesMarkets(seriesTicker, theme, status), 2, 500);
+    } catch (err) {
+      console.warn(`Kalshi series ${seriesTicker} fetch failed`, err);
+      return null;
     }
   });
+  const out: Market[] = [];
+  for (const res of results) if (res) out.push(...res);
   return out;
 }
 
