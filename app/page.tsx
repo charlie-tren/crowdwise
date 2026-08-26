@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { BoardView } from "@/components/BoardView";
 import { HeadlineOdds } from "@/components/HeadlineOdds";
 import { EventCalendar } from "@/components/EventCalendar";
@@ -18,6 +19,19 @@ import type { BoardPayload, Market } from "@/lib/types";
 // every request. No external store (KV) or cron needed.
 export const revalidate = 300;
 export const maxDuration = 60;
+
+// The Atlanta Fed workbook is fetched with `cache: "no-store"` (it is >2 MB, over
+// Next's per-item data-cache limit). An uncached fetch on the render path opts the
+// WHOLE route out of static generation, which made `/` the only dynamic page on the
+// site: every visit re-ran the board fetch, the 2 MB download and the sparklines,
+// and <Link> could not prefetch it, so clicking the logo took seconds. Wrapping the
+// call in its own cache scope keeps the download off the route's dynamic tracking
+// and caches the tiny PARSED result instead. The Fed updates the file daily.
+const cachedFedFuturesPath = unstable_cache(
+  () => fetchFedFuturesPath(),
+  ["atlanta-fed-mpt-path"],
+  { revalidate: 21_600, tags: ["fed-futures"] },
+);
 
 async function getBoard(): Promise<BoardPayload> {
   const markets = await fetchTopMarkets();
@@ -45,7 +59,7 @@ export default async function HomePage() {
 
   // OIS/SOFR futures-implied path (Atlanta Fed) to overlay against the crowd path.
   // Best-effort: null (fetch/parse failure) falls back to the crowd-only chart.
-  const fedFutures = path.length >= 2 ? await fetchFedFuturesPath() : null;
+  const fedFutures = path.length >= 2 ? await cachedFedFuturesPath() : null;
   const overlay = fedFutures ? buildOverlaySeries(fedFutures, path, now.getTime()) : [];
 
   // 7-day trend for the headline tiles (bounded: only the ~4 tile markets).
