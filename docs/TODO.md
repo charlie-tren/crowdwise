@@ -66,7 +66,26 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
 
 ## Found 2026-08-26 (from the chart-legibility pass)
 
-8. **[P2 · AUTO] The board carries the same proposition on more than one series.** Two
+8. **[DONE 2026-08-26 · fe66bc0 + 55e0f8f] Duplicate-looking timeline rows.** The
+   original diagnosis below was WRONG on two counts, both corrected by enumerating every
+   raw-vs-rendered title on the live board rather than reading the visible case:
+   (a) the collisions are **cross-venue** (Kalshi vs Polymarket), not two Kalshi series,
+   so deduping would have deleted the cross-venue spread this site exists to show;
+   (b) the "Fed cuts rates before 2027" pair at 8%/13% was **not a duplicate at all** -
+   one was "Fed emergency rate cut before 2027?" being mislabelled as the broad any-cut
+   market. That hunt also found `>25bps` being dropped from 24 markets, which rendered
+   "Fed hikes >25bps at the Sep 2026 meeting" as "Fed hikes at the Sep 2026 meeting".
+   Resolution: fix both mislabellings, keep both rows, name the venue on the ones that
+   still share a label. Residual logged as item 10.
+
+10. **[P3 · AUTO] Open-ended buckets share a proposition key regardless of threshold.**
+   `parseFedProposition` keys ">N bps" as `bps: -1` for any N, so a hypothetical ">25bps"
+   and ">50bps" hike for the same meeting would cross-venue match each other. No such
+   pair exists on the board today, which is why the key was left alone when the display
+   was fixed (changing it moves cross-venue pairing and the distribution). Worth closing
+   before either venue lists a second open-ended bucket.
+
+~~8-old. The board carries the same proposition on more than one series.~~ Two
    Kalshi series can both ask "does the Fed hold in September", so the timeline shows
    genuine near-duplicates ("Fed cuts rates before 2027" at 8% and again at 13%, the same
    `displayTitle` from two tickers with different pricing). The movers panel now dedupes
