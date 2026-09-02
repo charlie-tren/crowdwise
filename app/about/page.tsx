@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "About · Crowdwise" };
+export const metadata: Metadata = {
+  title: "About · Crowdwise",
+  // Paired with the lede on this page - keep identical.
+  description:
+    "Crowdwise shows live prediction-market probabilities across macro themes, pulled from the Kalshi and Polymarket public APIs and refreshed about every 10 minutes.",
+  alternates: { canonical: "/about" },
+};
 
 export default function AboutPage() {
   return (

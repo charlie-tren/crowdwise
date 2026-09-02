@@ -22,7 +22,17 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const markets = await fetchTopMarkets();
   const m = await findMarket(id, markets);
   if (!m) return { title: "Market · Crowdwise" };
-  return { title: `${displayTitle(m).slice(0, 60)} · Crowdwise` };
+  // Each market page carried the site-wide description before this, so ~130 pages
+  // described themselves identically. State this market's own subject instead:
+  // the question, where it trades and when it settles. No probability in the
+  // description - the number moves every few minutes and a snippet Google cached
+  // last week would be quoting a stale price as if it were current.
+  const settles = m.endDate ? `, settling ${m.endDate}` : "";
+  return {
+    title: `${displayTitle(m).slice(0, 60)} · Crowdwise`,
+    description: `${displayTitle(m)} - live implied probability from ${m.platform}${settles}.`,
+    alternates: { canonical: `/market/${encodeURIComponent(m.id)}` },
+  };
 }
 
 export default async function MarketPage({ params }: { params: Promise<{ id: string }> }) {
