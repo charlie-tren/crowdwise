@@ -2,11 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Script from "next/script";
 import { Nav } from "@/components/Nav";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  // Absolute base for canonicals and for the OG/Twitter image URLs, which were
+  // resolving relative before this.
+  metadataBase: new URL(SITE_URL),
   title: "Crowdwise",
+  // PAIRED with the visible lede on app/page.tsx - keep the two identical, word
+  // for word. Google ignores the description tag as often as not and builds its
+  // own snippet from the h1 plus visible text, so the wanted sentence has to be
+  // in both places or the snippet is whatever it picks. Same rule on every page
+  // below: each description is its page's lede verbatim.
   description: "Live odds on macro events - Fed decisions, inflation, recessions - from Kalshi and Polymarket.",
+  alternates: { canonical: "/" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
