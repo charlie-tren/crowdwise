@@ -104,6 +104,30 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
    is used by the board. Costs a wider `/api/movers` response, so check the payload before
    committing to it.
 
+11. **[DONE 2026-09-02 · 6f9dd6a + 3b309c3] SEO hygiene.** robots.txt and sitemap.xml
+   both 404'd; all seven pages plus ~130 market pages shared one description; no
+   metadataBase or canonicals. All fixed and verified live. Sitemap is capped at the top
+   100 markets by volume, deliberately not all ~600, because templated near-identical
+   pages at that scale read as auto-generated content and risk the subdomain.
+
+12. **[P3 · AUTO] /map and /timeline expose no crawlable market links.** Their rows
+   navigate with `router.push` on a div/button rather than an anchor, so they contribute
+   nothing to crawl discovery (`/` and `/value` carry 115 and 122 links). The sitemap now
+   covers discovery, so this is cosmetic for SEO, but an anchor would also give those rows
+   middle-click and open-in-new-tab, which they currently lack. Worth doing for the
+   interaction, not for the ranking.
+
+**On SEO generally (assessed 2026-09-02, worth re-reading before anyone starts an SEO
+push):** Search Console showed 20 impressions and 0 clicks at average rank 14.4. Zero
+clicks at rank 14 is the *predicted* outcome, not a finding, so there is no click-through
+problem in that data. Crowdwise gets more impressions than the other projects mainly
+because it has ~130 pages against their one. The queries it would target are held by the
+venues themselves plus purpose-built SEO domains (defirate, coingape,
+predictionmarketspicks, primerates), and the cross-venue angle is already occupied by
+predictioncompare.com. A zero-authority subdomain does not take those positions with
+on-page work. The growth plan at the top of this file (content flywheel + owned email)
+remains the right bet; the work above is hygiene, not a strategy.
+
 ## Promotion (growth plan, not code)
 - Daily macro chart on X/FinTwit (Fed-path-vs-crowd, or the widest cross-venue gap)
   linking back - the flywheel; the tool's own visuals are the marketing.
