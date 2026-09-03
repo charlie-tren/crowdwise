@@ -101,8 +101,20 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
    net move, so the shape is free apart from payload size. A dumbbell says where it
    started and finished; a sparkline says whether it drifted or jumped, which is the
    question a mover actually raises. `components/charts/Sparkline.tsx` already exists and
-   is used by the board. Costs a wider `/api/movers` response, so check the payload before
-   committing to it.
+   is used by the board. **Payload measured 03/09/2026, and it is not the obstacle the line
+   above assumed:** sending `[iso, prob]` pairs costs +145% (2190 -> 5358 bytes), but a
+   sparkline needs no dates - the points are evenly spaced daily - so a probabilities-only
+   array costs ~650 bytes, +30% on a 2.2KB response. Negligible.
+
+   **Recommendation: build it, probs-only.** The series is already fetched and discarded,
+   `components/charts/Sparkline.tsx` already exists and is used by the board, and the
+   dumbbell cannot distinguish a steady drift from a spike-and-retrace, which is the
+   question a mover actually raises.
+
+   **Not done unprompted because it adds a visual element to a panel**, and that is the
+   class of change Charlie has rejected before (the per-row arrow on /research, the accent
+   colour on Photocopy). **Default if he says nothing: leave it as is.** One word reopens
+   it, and it is about an hour including a rendered before/after to look at.
 
 11. **[DONE 2026-09-02 · 6f9dd6a + 3b309c3] SEO hygiene.** robots.txt and sitemap.xml
    both 404'd; all seven pages plus ~130 market pages shared one description; no
