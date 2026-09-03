@@ -110,12 +110,17 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
    100 markets by volume, deliberately not all ~600, because templated near-identical
    pages at that scale read as auto-generated content and risk the subdomain.
 
-12. **[P3 · AUTO] /map and /timeline expose no crawlable market links.** Their rows
+12. **[DONE 2026-09-03 · 31e7479] /timeline exposed no crawlable market links.** Their rows
    navigate with `router.push` on a div/button rather than an anchor, so they contribute
    nothing to crawl discovery (`/` and `/value` carry 115 and 122 links). The sitemap now
    covers discovery, so this is cosmetic for SEO, but an anchor would also give those rows
-   middle-click and open-in-new-tab, which they currently lack. Worth doing for the
-   interaction, not for the ranking.
+   middle-click and open-in-new-tab, which they currently lack.
+   DONE: both are `next/link` anchors now, and `role="img"` came off both containers
+   because presenting 125 real links as one image hides them from a screen reader.
+   /timeline went 0 -> 80 crawlable links live. **/map is still 0 and that is
+   deliberate**: the movers list is fetched client-side so its links are not in the
+   server HTML, and the treemap and scatter are recharts marks where an anchor is not
+   practical. The sitemap already covers discovery there.
 
 **On SEO generally (assessed 2026-09-02, worth re-reading before anyone starts an SEO
 push):** Search Console showed 20 impressions and 0 clicks at average rank 14.4. Zero
