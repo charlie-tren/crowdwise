@@ -1,5 +1,5 @@
 "use client";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { THEME_COLOURS } from "@/lib/themeColours";
 
 export interface MoverBar { id: string; title: string; category: string; move: number; }
@@ -15,14 +15,12 @@ const pctLabel = (x: number) => `${Math.round(clamp01(x) * 100)}%`;
 const ppLabel = (v: number) => `${v >= 0 ? "+" : "-"}${Math.abs(v * 100).toFixed(1)}pp`;
 
 export function MoversSlope({ movers }: { movers: SlopeMover[] }) {
-  const router = useRouter();
   if (!movers.length) {
     return <p className="text-sm text-muted">No markets moved materially over the last week.</p>;
   }
 
   return (
     <div
-      role="img"
       aria-label="Top movers: each market's implied probability a week ago versus now, shown as a was-to-now dumbbell coloured by direction"
     >
       {/* Legend + axis scale */}
@@ -50,9 +48,8 @@ export function MoversSlope({ movers }: { movers: SlopeMover[] }) {
 
           return (
             <li key={m.id}>
-              <button
-                type="button"
-                onClick={() => router.push("/market/" + encodeURIComponent(m.id))}
+              <Link
+                href={`/market/${encodeURIComponent(m.id)}`}
                 className="grid w-full grid-cols-[minmax(0,1fr)] items-center gap-x-5 gap-y-1.5 py-3 text-left transition-colors hover:bg-white/[0.03] sm:grid-cols-[minmax(0,24rem)_1fr_auto]"
                 title={`${m.title}\n${m.category} · ${pctLabel(was)} -> ${pctLabel(now)} (${ppLabel(m.move)})`}
               >
@@ -99,7 +96,7 @@ export function MoversSlope({ movers }: { movers: SlopeMover[] }) {
                     {ppLabel(m.move)}
                   </span>
                 </span>
-              </button>
+              </Link>
             </li>
           );
         })}

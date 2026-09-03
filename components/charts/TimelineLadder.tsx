@@ -1,5 +1,5 @@
 "use client";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { THEME_COLOURS } from "@/lib/themeColours";
 import { displayTitle } from "@/lib/highlights";
 import type { Market } from "@/lib/types";
@@ -23,7 +23,6 @@ const TICKS = 5;
 // The phone layout spends that width on the name and prints each row's own
 // resolution date instead - the rows are still in date order either way.
 export function TimelineLadder({ markets }: { markets: Market[] }) {
-  const router = useRouter();
   const rows = markets
     .filter((m) => m.prob != null && m.endDate)
     .map((m) => ({ ...m, ms: new Date(`${m.endDate}T00:00:00Z`).getTime() }))
@@ -58,7 +57,9 @@ export function TimelineLadder({ markets }: { markets: Market[] }) {
   }
 
   return (
-    <div role="img" aria-label="Maturity ladder of market resolution dates versus implied probability">
+    // Not role="img": the rows are real links now, and presenting the whole
+    // ladder as a single image would hide every one of them from a screen reader.
+    <div aria-label="Maturity ladder of market resolution dates versus implied probability">
       {/* axis - desktop only, see the note above */}
       <div className="hidden grid-cols-[minmax(0,26rem)_1fr] items-center border-b border-white/[0.06] pb-2 sm:grid">
         <div />
@@ -88,9 +89,13 @@ export function TimelineLadder({ markets }: { markets: Market[] }) {
         const label = displayTitle(r);
         const shared = (labelCounts.get(label) ?? 0) > 1;
         return (
-          <div
+          // A real anchor, not a div with onClick. The row navigates either way,
+          // but only an href gives middle-click, open-in-new-tab and copy-link -
+          // and it is the only form a crawler can follow, which is why /timeline
+          // contributed nothing to discovery.
+          <Link
             key={r.id}
-            onClick={() => router.push("/market/" + encodeURIComponent(r.id))}
+            href={`/market/${encodeURIComponent(r.id)}`}
             className="grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center border-b border-white/[0.06] py-1.5 transition-colors hover:bg-white/[0.02] sm:grid-cols-[minmax(0,26rem)_1fr]"
             title={r.title}
           >
@@ -133,7 +138,7 @@ export function TimelineLadder({ markets }: { markets: Market[] }) {
                 <span className="text-[12px] font-semibold tabular-nums text-[var(--text)]">{pct}</span>
               </div>
             </div>
-          </div>
+          </Link>
         );
       })}
     </div>
