@@ -187,10 +187,17 @@ export interface FedDistribution {
   total: number; // sum of outcome probs; ~1 when the market is complete
 }
 
-function outcomeLabel(action: FedAction, bps: number): string {
+// The open-ended bucket read as a bare "Hike >" in the grid's key - a comparator
+// with nothing to compare to. The threshold is already parsed as openEndedFromBps
+// and fedTileTitle has been rendering it correctly all along; only this label
+// dropped it.
+function outcomeLabel(action: FedAction, bps: number, openEndedFromBps?: number | null): string {
   if (action === "hold") return "Hold";
   const verb = action === "hike" ? "Hike" : "Cut";
-  if (bps === -1) return `${verb} >`;
+  // The null branch is defensive and not reachable through parseFedProposition,
+  // whose BPS_RE always captures a number when it matches at all. A bare verb is
+  // still a better answer than a comparator with nothing after it.
+  if (bps === -1) return openEndedFromBps != null ? `${verb} >${openEndedFromBps}` : verb;
   return `${verb} ${bps}`;
 }
 
@@ -221,7 +228,7 @@ function meetingOutcomes(fedMarkets: FedMarket[], ym: string): FedOutcome[] {
   }
   return [...byOutcome.values()]
     .map((x) => ({
-      label: outcomeLabel(x.fed.action, x.fed.bps),
+      label: outcomeLabel(x.fed.action, x.fed.bps, x.fed.openEndedFromBps),
       action: x.fed.action,
       bps: x.fed.bps,
       prob: x.m.prob as number,

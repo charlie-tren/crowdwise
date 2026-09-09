@@ -176,6 +176,24 @@ describe("fedDistribution", () => {
     expect(dist!.total).toBeCloseTo(1.0, 5);
   });
 
+  // The open-ended bucket rendered as a bare "Hike >" in the grid's key - a
+  // comparator with nothing after it. fedTileTitle had been rendering the same
+  // market correctly as ">25bps" all along, so the threshold was parsed and only
+  // this label dropped it.
+  it("names what the open-ended bucket is greater THAN", () => {
+    const dist = fedDistribution(
+      [
+        meeting("Will the Fed Hike rates by 0bps at their September 2026 meeting?", 0.5),
+        meeting("Will the Fed Hike rates by 25bps at their September 2026 meeting?", 0.3),
+        meeting("Will the Fed Hike rates by more than 25bps at their September 2026 meeting?", 0.2),
+      ],
+      "2026-01",
+    );
+    expect(dist!.outcomes.map((o) => o.label)).toEqual(["Hold", "Hike 25", "Hike >25"]);
+    expect(dist!.outcomes.map((o) => o.label)).not.toContain("Hike >");
+  });
+
+
   it("selects the nearest upcoming meeting, not a past one", () => {
     const dist = fedDistribution(
       [
