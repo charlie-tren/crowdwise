@@ -3,9 +3,12 @@ import { BoardView } from "@/components/BoardView";
 import { HeadlineOdds } from "@/components/HeadlineOdds";
 import { EventCalendar } from "@/components/EventCalendar";
 import { FedDistributionBar, meetingLabel } from "@/components/charts/FedDistributionBar";
+import { centralBankRows, fedBpsPricedBy } from "@/lib/centralBanks";
+import { fetchAsxPath, bpsPricedBy } from "@/lib/asxFutures";
 import { FedPathChart } from "@/components/charts/FedPathChart";
 import { FedPathGrid } from "@/components/charts/FedPathGrid";
 import { FedPathOverlay } from "@/components/charts/FedPathOverlay";
+import { CentralBankGrid } from "@/components/charts/CentralBankGrid";
 import { fetchTopMarkets } from "@/lib/board";
 import { headlineOdds, fedHeadlineTile, fedDistribution, fedPath, fedMeetingGrid } from "@/lib/highlights";
 import { fetchFedFuturesPath, buildOverlaySeries } from "@/lib/fedFutures";
@@ -61,6 +64,26 @@ export default async function HomePage() {
   // Best-effort: null (fetch/parse failure) falls back to the crowd-only chart.
   const fedFutures = path.length >= 2 ? await cachedFedFuturesPath() : null;
   const overlay = fedFutures ? buildOverlaySeries(fedFutures, path, now.getTime()) : [];
+
+  // Central banks: the crowd's odds of a rise before 2027 for seven banks, beside
+  // a real-money comparator where a free curve exists. Only the Fed and the RBA
+  // have one; the other five render crowd-only rather than borrowing a number.
+  // Best-effort like the Fed overlay - a failed ASX fetch drops one comparator,
+  // not the panel.
+  const asx = await fetchAsxPath();
+  const cbComparators = { bps: {} as Record<string, number>,
+                          source: {} as Record<string, string> };
+  const asxBps = asx ? bpsPricedBy(asx, "2026-12-31") : null;
+  if (asxBps !== null) {
+    cbComparators.bps.RBA = asxBps;
+    cbComparators.source.RBA = "ASX 30-day interbank futures";
+  }
+  const fedBps = fedFutures ? fedBpsPricedBy(fedFutures, "2026-12-31") : null;
+  if (fedBps !== null) {
+    cbComparators.bps.FED = fedBps;
+    cbComparators.source.FED = "Atlanta Fed / CME";
+  }
+  const cbRows = centralBankRows(board.markets, cbComparators);
 
   // 7-day trend for the headline tiles (bounded: only the ~4 tile markets).
   const tileIds = new Set(tiles.map((t) => t.id));
@@ -119,6 +142,19 @@ export default async function HomePage() {
                 The full outcome distribution priced for each upcoming FOMC meeting.
               </p>
               <FedPathGrid meetings={grid} />
+            </section>
+          )}
+
+          {cbRows.length >= 2 && (
+            <section className="mb-8">
+              <h2 className="mb-1 text-lg font-medium">Central banks: the crowd vs the curve</h2>
+              <p className="mb-3 text-sm text-muted">
+                The chance each central bank raises before 2027, against what its own
+                futures curve has priced. Kalshi lists one binary per bank and no
+                meeting-by-meeting ladder outside the Fed, so this is the same
+                comparison the chart above makes, cut across banks rather than time.
+              </p>
+              <CentralBankGrid rows={cbRows} />
             </section>
           )}
 
