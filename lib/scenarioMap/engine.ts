@@ -32,14 +32,23 @@ const REF_RULES: Record<string, (refs: string[], weights?: number[]) => string |
     refs.length === 3 ? null : "Depends takes exactly three inputs: the condition and the two conditionals",
   and: (refs) => (refs.length >= 2 ? null : "AND takes at least two inputs"),
   or: (refs) => (refs.length >= 2 ? null : "OR takes at least two inputs"),
-  mix: (refs, weights) =>
-    !weights || weights.length !== refs.length
-      ? "Mix needs one weight per input"
-      : refs.length < 2
-        ? "Mix takes at least two inputs"
-        : weights.some((w) => w < 0) || weights.reduce((a, b) => a + b, 0) <= 0
-          ? "Mix weights must be positive"
-          : null,
+  mix: (refs, weights) => {
+    if (!weights || weights.length !== refs.length) return "Mix needs one weight per input";
+    if (refs.length < 2) return "Mix takes at least two inputs";
+    // Per-weight finiteness first: catches Infinity/NaN individually. This is
+    // a different fact from a weight that is finite but negative, so it gets
+    // its own reason.
+    if (!weights.every((w) => Number.isFinite(w)))
+      return "Mix weights must be ordinary numbers, not infinite or not-a-number";
+    if (weights.some((w) => w < 0)) return "Mix weights must be positive";
+    // Two finite weights can still sum to something non-finite (e.g. two
+    // values near the top of double precision). A per-weight check alone
+    // does not catch that, so the sum needs its own finiteness check too.
+    const sum = weights.reduce((a, b) => a + b, 0);
+    if (!Number.isFinite(sum)) return "Mix weights add up to a number too large to use";
+    if (sum <= 0) return "Mix weights must be positive";
+    return null;
+  },
 };
 
 export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult {
@@ -171,16 +180,17 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
   return { get: (id: string) => res.get(id), order };
 }
 
-// NaN-safe on purpose: `x < 0 ? 0 : x > 1 ? 1 : x` passes NaN straight through,
-// because both comparisons are false for it. A single NaN then reaches percentile,
-// where it corrupts the sort (a comparator returning NaN leaves the array in an
-// arbitrary order) and the figure comes out wrong with nothing to say so.
-// resolveNodes now rejects a non-finite market price and a non-finite input
-// bound before either becomes a draw, and every formula operates only on refs
-// that are already resolved (and therefore already clamped), so a NaN should
-// no longer reach this function by the normal path. This is the backstop for
-// a path that check does not cover.
-const clamp01 = (x: number) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
+// A plain range clamp, nothing more. It used to also launder a non-finite x
+// to 0 (`x < 0 ? 0 : x > 1 ? 1 : x` passes NaN straight through both
+// comparisons, and a naive fix that instead special-cased NaN still let
+// Infinity clamp to a confident 1). That made every arithmetic accident
+// anywhere in the engine come out as a tight, confident, wrong figure with
+// nothing to say so - the same shape of bug as the NaN market price, just
+// reachable through more paths. The caller (evaluateMap) now checks
+// Number.isFinite on the raw value BEFORE this runs, so clamp01 only ever
+// sees a value already known finite, and a non-finite value poisons the node
+// instead of being clamped into something that looks trustworthy.
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 
 /**
  * Resolve, then sample. Only resolvable nodes are sampled: an unresolved node's
@@ -199,6 +209,14 @@ export function evaluateMap(
 
   const rng = makeRng(SEED);
   const draw = new Map<string, number>();
+  // A node whose own computed value goes non-finite on any draw is poisoned,
+  // and so is any node downstream of it - checked via this set before it
+  // reads a ref, so the poison can never be computed away by arithmetic that
+  // happens not to reintroduce a finite-looking number. Once poisoned, a
+  // node stays poisoned for the rest of the evaluation and reports
+  // unresolved, the same as a statically unresolved node. Nodes that are not
+  // downstream of the problem never touch this set and are unaffected.
+  const poisoned = new Set<string>();
 
   for (let d = 0; d < draws; d++) {
     for (const id of resolved.order) {
@@ -208,6 +226,8 @@ export function evaluateMap(
         v = resolved.get(id)!.value!;
       } else if (n.kind === "input") {
         v = sampleTriangular(n.low, n.likely, n.high, rng());
+      } else if (n.refs.some((ref) => poisoned.has(ref))) {
+        v = NaN;
       } else {
         const r = n.refs.map((ref) => draw.get(ref)!);
         switch (n.op) {
@@ -224,6 +244,11 @@ export function evaluateMap(
           default: v = 0;
         }
       }
+      if (!Number.isFinite(v)) {
+        poisoned.add(id);
+        draw.set(id, NaN);
+        continue;
+      }
       v = clamp01(v);
       draw.set(id, v);
       samples.get(id)!.push(v);
@@ -235,6 +260,15 @@ export function evaluateMap(
     const r = resolved.get(n.id)!;
     if (r.status !== "ok") {
       out.set(n.id, { id: n.id, status: "unresolved", reason: r.reason, p50: null, p10: null, p90: null });
+      continue;
+    }
+    if (poisoned.has(n.id)) {
+      out.set(n.id, {
+        id: n.id,
+        status: "unresolved",
+        reason: "The calculation did not produce a usable number",
+        p50: null, p10: null, p90: null,
+      });
       continue;
     }
     const xs = samples.get(n.id) ?? [];

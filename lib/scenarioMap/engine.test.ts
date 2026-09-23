@@ -278,4 +278,75 @@ describe("evaluateMap", () => {
       expect(r.get(id)!.p90!).toBeLessThanOrEqual(1);
     }
   });
+
+  it("a mix node with an infinite weight is unresolved with null figures, not a confident 0", () => {
+    const r = evaluateMap(
+      map(point("a", 0.5), point("b", 0.5),
+        { id: "f", kind: "formula", label: "F", op: "mix", refs: ["a", "b"], weights: [Infinity, 1] }),
+      [],
+    );
+    const v = r.get("f")!;
+    expect(v.status).toBe("unresolved");
+    expect(v.reason).toBeTruthy();
+    expect(v.p50).toBeNull();
+    expect(v.p10).toBeNull();
+    expect(v.p90).toBeNull();
+  });
+
+  it("a mix node with a NaN weight is unresolved with null figures", () => {
+    const r = evaluateMap(
+      map(point("a", 0.5), point("b", 0.5),
+        { id: "f", kind: "formula", label: "F", op: "mix", refs: ["a", "b"], weights: [Number.NaN, 1] }),
+      [],
+    );
+    const v = r.get("f")!;
+    expect(v.status).toBe("unresolved");
+    expect(v.reason).toBeTruthy();
+    expect(v.p50).toBeNull();
+  });
+
+  it("a mix node with two finite weights whose SUM overflows is unresolved, not just per-weight checked", () => {
+    // Neither weight alone is non-finite; only their sum is. A fix that only
+    // validates individual weights does not catch this one.
+    const r = evaluateMap(
+      map(point("a", 0.5), point("b", 0.5),
+        { id: "f", kind: "formula", label: "F", op: "mix", refs: ["a", "b"], weights: [1e308, 1e308] }),
+      [],
+    );
+    const v = r.get("f")!;
+    expect(v.status).toBe("unresolved");
+    expect(v.reason).toBeTruthy();
+    expect(v.p50).toBeNull();
+  });
+
+  it("a sibling of a poisoned node still reports its own figures", () => {
+    // One broken mix node (sum overflow) and one healthy node that does not
+    // read it. The healthy node must still carry a real number.
+    const r = evaluateMap(
+      map(
+        point("a", 0.5), point("b", 0.5),
+        { id: "broken", kind: "formula", label: "Broken", op: "mix", refs: ["a", "b"], weights: [1e308, 1e308] },
+        point("c", 0.3),
+      ),
+      [],
+    );
+    const healthy = r.get("c")!;
+    expect(healthy.status).toBe("ok");
+    expect(healthy.p50).toBeCloseTo(0.3, 6);
+  });
+
+  it("a node downstream of a poisoned node is also unresolved, not a confident figure", () => {
+    const r = evaluateMap(
+      map(
+        point("a", 0.5), point("b", 0.5),
+        { id: "broken", kind: "formula", label: "Broken", op: "mix", refs: ["a", "b"], weights: [1e308, 1e308] },
+        { id: "downstream", kind: "formula", label: "D", op: "not", refs: ["broken"] },
+      ),
+      [],
+    );
+    const d = r.get("downstream")!;
+    expect(d.status).toBe("unresolved");
+    expect(d.reason).toBeTruthy();
+    expect(d.p50).toBeNull();
+  });
 });
