@@ -163,6 +163,28 @@ remains the right bet; the work above is hygiene, not a strategy.
   `boardStore` has data. Verified on prod: deep-in-the-list markets 200, bogus ids still 404.
 - Non-Fed verbose titles (WTI oil strikes, jobs, GDP, geopolitics) left deliberately - no
   clean universal transform; only Fed titles are canonicalised (`displayTitle`). WON'T-DO.
+- **Compare misses the biggest cross-venue pair on the board, and adding it needs a
+  POLARITY decision first.** Audited 23/09/2026 by enumerating every pair `findCrossVenue`
+  produces against a live 696-market pull. All 6 pairs it makes are genuinely the same
+  proposition, so the matcher is sound and there are no false pairs. The gap is coverage:
+  only 7 Polymarket markets parse at all.
+  The missing pair is the largest Fed market on each venue:
+  Kalshi "Will the Federal Reserve cut rates before 2027?" at 5.4% on $1.34m, against
+  Polymarket "Will no Fed rate cuts happen in 2026?" at 96.5% on $8.48m, whose NO side is
+  3.5%. Same window, 1.9pp apart, $9.8m combined, shown nowhere.
+  `parseFedProposition` cannot see either: it needs a specific meeting and a bps amount,
+  and an "at all, by date" market has neither.
+  **The reason this is not a quick fix:** the two markets are INVERSES, and `Proposition`
+  has no concept of polarity. `CrossVenuePair` compares `kalshiProb` against
+  `polymarketProb` directly. Pairing a YES with a NO means teaching the matcher negation,
+  which is precisely the machinery that currently guarantees it never pairs a hike with a
+  hold. Worth doing, worth doing carefully, and worth a fixture test per venue phrasing
+  before it goes near the page.
+  Two other things the same audit settled, so nobody re-derives them: Kalshi's only
+  recession markets are six rows of "When will the next U.S. recession start?", a
+  date-bucket market with no yes/no counterpart, so the unmatched Polymarket recession
+  market is CORRECT rather than a miss. And Polymarket's largest markets are Geopolitics
+  and Elections, which Kalshi barely carries here, so those can never pair.
 - Dormant Metaculus integration (`lib/metaculus.ts`) - BLOCKED, revisit only if access opens.
 - Scenario Map shipped 23/09/2026, replacing the flat picker and the thesis-basket cards.
   The four theses are now the built-in maps (`lib/scenarioMap/builtins.ts`) and resolve
