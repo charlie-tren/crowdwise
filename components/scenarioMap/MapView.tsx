@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { pct } from "@/lib/format";
+import { pctScenario } from "@/lib/format";
 import { layoutMap, NODE_H, NODE_W } from "@/lib/scenarioMap/layout";
 import type { NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
 import { THEME_COLOURS } from "@/lib/themeColours";
@@ -104,11 +104,11 @@ export function MapView({
                 {ok ? (
                   <>
                     <text x={10} y={40} fontSize={17} fontWeight={600} fill={colour} style={{ fontVariantNumeric: "tabular-nums" }}>
-                      {pct(r.p50, 0)}
+                      {pctScenario(r.p50)}
                     </text>
                     {hasRange && (
                       <text x={NODE_W - 10} y={40} textAnchor="end" fontSize={10.5} fill="var(--muted)" style={{ fontVariantNumeric: "tabular-nums" }}>
-                        {pct(r.p10, 0)} to {pct(r.p90, 0)}
+                        {pctScenario(r.p10)} to {pctScenario(r.p90)}
                       </text>
                     )}
                   </>

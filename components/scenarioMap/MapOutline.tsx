@@ -1,4 +1,4 @@
-import { pct } from "@/lib/format";
+import { pctScenario } from "@/lib/format";
 import type { NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
 
 /**
@@ -32,10 +32,10 @@ export function MapOutline({ map, results }: { map: ScenarioMap; results: Map<st
           <span className="min-w-0 flex-1 text-[13px] text-[var(--text)]">{node.label}</span>
           {r?.status === "ok" ? (
             <span className="shrink-0 text-right">
-              <span className="tabular-nums text-[15px] font-semibold text-accent">{pct(r.p50, 0)}</span>
+              <span className="tabular-nums text-[15px] font-semibold text-accent">{pctScenario(r.p50)}</span>
               {r.p10 != null && r.p90 != null && r.p90 - r.p10 > 0.005 && (
                 <span className="ml-2 tabular-nums text-[11px] text-muted">
-                  {pct(r.p10, 0)} to {pct(r.p90, 0)}
+                  {pctScenario(r.p10)} to {pctScenario(r.p90)}
                 </span>
               )}
             </span>

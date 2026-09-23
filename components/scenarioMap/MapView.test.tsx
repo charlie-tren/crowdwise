@@ -69,4 +69,27 @@ describe("MapView", () => {
     const { container } = render(<MapView map={map} results={evaluateMap(map, [])} width={0} />);
     expect(container.querySelector("svg")).toBeNull();
   });
+
+  it("never claims a computed 0.45% chance cannot happen", () => {
+    // 0.09 * 0.05: the Recession-in-2026 combined node.
+    const legs: ScenarioMap = {
+      id: "legs", name: "legs",
+      nodes: [
+        { id: "a", kind: "input", label: "Leg one", low: 0.09, likely: 0.09, high: 0.09, source: "x" },
+        { id: "b", kind: "input", label: "Leg two", low: 0.05, likely: 0.05, high: 0.05, source: "x" },
+        { id: "f", kind: "formula", label: "Combined", op: "and", refs: ["a", "b"] },
+      ],
+    };
+    render(<MapView map={legs} results={evaluateMap(legs, [])} />);
+    expect(screen.queryByText("0%")).toBeNull();
+  });
+
+  it("never claims a computed 99.6% chance is certain", () => {
+    const near: ScenarioMap = {
+      id: "near", name: "near",
+      nodes: [{ id: "a", kind: "input", label: "Near-certain", low: 0.996, likely: 0.996, high: 0.996, source: "x" }],
+    };
+    render(<MapView map={near} results={evaluateMap(near, [])} />);
+    expect(screen.queryByText("100%")).toBeNull();
+  });
 });

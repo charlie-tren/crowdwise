@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { pct } from "@/lib/format";
+import { pctScenario } from "@/lib/format";
 import type { MapNode, NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
 import type { Market } from "@/lib/types";
 
@@ -83,10 +83,10 @@ export function NodeList({
               </span>
               {r?.status === "ok" ? (
                 <span className="shrink-0 text-right">
-                  <span className="block tabular-nums text-[17px] font-semibold text-accent">{pct(r.p50, 0)}</span>
+                  <span className="block tabular-nums text-[17px] font-semibold text-accent">{pctScenario(r.p50)}</span>
                   {r.p10 != null && r.p90 != null && r.p90 - r.p10 > 0.005 && (
                     <span className="block tabular-nums text-[11px] text-muted">
-                      {pct(r.p10, 0)} to {pct(r.p90, 0)}
+                      {pctScenario(r.p10)} to {pctScenario(r.p90)}
                     </span>
                   )}
                 </span>
