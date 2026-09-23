@@ -25,12 +25,22 @@ export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
             const kalshiLower = pair.kalshiProb <= pair.polymarketProb;
             const lowerName = kalshiLower ? "Kalshi" : "Polymarket";
             const notable = pair.divergence >= DIVERGENCE_NOTABLE;
-            const bar = (name: string, id: string, prob: number, colour: string) => (
+            // A comparable prob was computed as 1-quote when this side is a
+            // negated market (see `Polarity` in lib/crossVenue.ts) - so the
+            // percentage shown here can differ from what the venue itself
+            // quotes. Flagging it here, the same terse way the Scenario Map
+            // flags an inverted node ("NO side"), is what keeps a reader who
+            // clicks through from finding a different number and losing trust
+            // in the page.
+            const bar = (name: string, id: string, prob: number, colour: string, inverted: boolean) => (
               <Link
                 href={`/market/${encodeURIComponent(id)}`}
                 className="group grid grid-cols-[86px_1fr_52px] items-center gap-3"
               >
-                <span className="text-[13px] text-muted group-hover:text-[var(--text)]">{name}</span>
+                <span className="text-[13px] text-muted group-hover:text-[var(--text)]">
+                  {name}
+                  {inverted && <span className="ml-1 text-[11px] text-[var(--muted-dim)]">NO side</span>}
+                </span>
                 <span className="relative h-2 overflow-hidden rounded-full bg-white/[0.06]">
                   <span
                     className="absolute inset-y-0 left-0 rounded-full"
@@ -48,8 +58,8 @@ export function CrossVenueView({ pairs }: { pairs: CrossVenuePair[] }) {
 
                 {/* aligned probability bars, both venues on the same 0-100% scale */}
                 <div className="mt-4 flex flex-col gap-3">
-                  {bar("Kalshi", pair.kalshi.id, pair.kalshiProb, KALSHI_COLOUR)}
-                  {bar("Polymarket", pair.polymarket.id, pair.polymarketProb, POLYMARKET_COLOUR)}
+                  {bar("Kalshi", pair.kalshi.id, pair.kalshiProb, KALSHI_COLOUR, pair.kalshiInverted)}
+                  {bar("Polymarket", pair.polymarket.id, pair.polymarketProb, POLYMARKET_COLOUR, pair.polymarketInverted)}
                 </div>
 
                 <div className="mt-3 flex items-center gap-2 text-[13px] text-muted">

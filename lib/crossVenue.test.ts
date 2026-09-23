@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseFedProposition, parseProposition, findCrossVenue } from "./crossVenue";
+import {
+  parseFedProposition,
+  parseProposition,
+  parseFedAnyCutProposition,
+  findCrossVenue,
+} from "./crossVenue";
 import type { Market } from "./types";
 
 let seq = 0;
@@ -342,5 +347,235 @@ describe("findCrossVenue", () => {
     expect(out).toHaveLength(2);
     expect(out[0].divergence).toBeGreaterThan(out[1].divergence);
     expect(out[0].kalshi.id).toBe(kalshiBig.id);
+  });
+});
+
+describe("parseFedAnyCutProposition", () => {
+  it("parses Kalshi's 'cut rates before <year+1>' as the positive polarity, keyed to year-1 (trap 3: 'before YYYY' is the year BEFORE)", () => {
+    const market = m({
+      platform: "Kalshi",
+      title: "Will the Federal Reserve cut rates before 2027?",
+      endDate: "2027-01-01",
+    });
+    expect(parseFedAnyCutProposition(market)).toEqual({ year: "2026", polarity: 1 });
+  });
+
+  it("parses Polymarket's 'no Fed rate cuts happen in <year>' as the negated polarity, keyed to the stated year directly", () => {
+    const market = m({
+      platform: "Polymarket",
+      title: "Will no Fed rate cuts happen in 2026?",
+      endDate: "2027-01-01",
+    });
+    expect(parseFedAnyCutProposition(market)).toEqual({ year: "2026", polarity: -1 });
+  });
+
+  it("never keys a 'before 2027' market the same as an actual 'in 2027' one (trap 3, other direction)", () => {
+    const before2027 = parseFedAnyCutProposition(
+      m({ platform: "Kalshi", title: "Will the Federal Reserve cut rates before 2027?", endDate: "2027-01-01" }),
+    );
+    const in2027 = parseFedAnyCutProposition(
+      m({ platform: "Polymarket", title: "Will no Fed rate cuts happen in 2027?", endDate: "2028-01-01" }),
+    );
+    expect(before2027?.year).not.toBe(in2027?.year);
+  });
+
+  it("does NOT match the count-ladder's exactly-one rung (trap 2: exactly-one is not at-least-one)", () => {
+    const market = m({
+      platform: "Polymarket",
+      title: "Will 1 Fed rate cut happen in 2026?",
+      endDate: "2027-01-01",
+    });
+    expect(parseFedAnyCutProposition(market)).toBeNull();
+  });
+
+  it("does NOT match the count-ladder's open-ended top rung", () => {
+    const market = m({
+      platform: "Polymarket",
+      title: "Will 12 or more Fed rate cuts happen in 2026?",
+      endDate: "2027-01-01",
+    });
+    expect(parseFedAnyCutProposition(market)).toBeNull();
+  });
+
+  it("does NOT match any other rung of the count ladder (2 through 11)", () => {
+    for (const n of [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
+      const market = m({
+        platform: "Polymarket",
+        title: `Will ${n} Fed rate cuts happen in 2026?`,
+        endDate: "2027-01-01",
+      });
+      expect(parseFedAnyCutProposition(market)).toBeNull();
+    }
+  });
+
+  it("does NOT steal the 'no change' HOLD market (trap 1: a generic no/not rule would break the existing Hold pairing)", () => {
+    const market = m({
+      platform: "Polymarket",
+      title: "Will there be no change in Fed interest rates after the October 2026 meeting?",
+      endDate: "2026-10-29",
+    });
+    expect(parseFedAnyCutProposition(market)).toBeNull();
+  });
+
+  it("does NOT match the emergency-cut qualifier (trap 4: a narrower proposition than at-least-one)", () => {
+    const market = m({
+      platform: "Polymarket",
+      title: "Fed emergency rate cut before 2027?",
+      endDate: "2027-01-01",
+    });
+    expect(parseFedAnyCutProposition(market)).toBeNull();
+  });
+
+  it("does NOT match a Bank of England 'raise before 2027' market (trap 5: same shape, different central bank)", () => {
+    const market = m({
+      platform: "Kalshi",
+      title: "Will the Bank of England raise the Bank Rate before 2027?",
+      endDate: "2027-01-01",
+    });
+    expect(parseFedAnyCutProposition(market)).toBeNull();
+  });
+
+  it("does NOT match Bank of Canada, RBA, Riksbank, SNB or Norges Bank 'raise before 2027' markets (trap 5, all six live titles)", () => {
+    const titles = [
+      "Will the Bank of Canada raise its target for the overnight rate before 2027?",
+      "Will the Reserve Bank of Australia raise its cash rate target before 2027?",
+      "Will the Riksbank raise its policy rate before 2027?",
+      "Will the Swiss National Bank raise the SNB policy rate before 2027?",
+      "Will Norges Bank raise its policy rate before 2027?",
+    ];
+    for (const title of titles) {
+      const market = m({ platform: "Kalshi", title, endDate: "2027-01-01" });
+      expect(parseFedAnyCutProposition(market)).toBeNull();
+    }
+  });
+});
+
+describe("findCrossVenue: at-least-one-cut-by-year family (polarity)", () => {
+  it("pairs Kalshi 'cut rates before 2027' with Polymarket 'no Fed rate cuts happen in 2026' on key fed|2026|cut|any", () => {
+    const kalshi = m({
+      platform: "Kalshi",
+      title: "Will the Federal Reserve cut rates before 2027?",
+      endDate: "2027-01-01",
+      prob: 0.054,
+      volume: 1340950.11,
+    });
+    const poly = m({
+      platform: "Polymarket",
+      title: "Will no Fed rate cuts happen in 2026?",
+      endDate: "2027-01-01",
+      prob: 0.965,
+      volume: 8480522.99,
+    });
+    const out = findCrossVenue([kalshi, poly]);
+    expect(out).toHaveLength(1);
+    expect(out[0].key).toBe("fed|2026|cut|any");
+    expect(out[0].kalshi.id).toBe(kalshi.id);
+    expect(out[0].polymarket.id).toBe(poly.id);
+  });
+
+  it("uses the comparable (1-prob) Polymarket probability, not the raw quoted one - a printed number must be one the venue actually quotes", () => {
+    const kalshi = m({
+      platform: "Kalshi",
+      title: "Will the Federal Reserve cut rates before 2027?",
+      endDate: "2027-01-01",
+      prob: 0.054,
+    });
+    const poly = m({
+      platform: "Polymarket",
+      title: "Will no Fed rate cuts happen in 2026?",
+      endDate: "2027-01-01",
+      prob: 0.965,
+    });
+    const out = findCrossVenue([kalshi, poly]);
+    expect(out).toHaveLength(1);
+    expect(out[0].kalshiProb).toBeCloseTo(0.054, 5);
+    expect(out[0].polymarketProb).toBeCloseTo(0.035, 5); // 1 - 0.965, NOT 0.965
+    expect(out[0].kalshiInverted).toBe(false);
+    expect(out[0].polymarketInverted).toBe(true);
+    expect(out[0].divergence).toBeCloseTo(Math.abs(0.054 - 0.035), 5);
+  });
+
+  it("does not pair the any-cut market with a count-ladder rung (they share a category but not a key)", () => {
+    const kalshi = m({
+      platform: "Kalshi",
+      title: "Will the Federal Reserve cut rates before 2027?",
+      endDate: "2027-01-01",
+      prob: 0.054,
+    });
+    const polyOne = m({
+      platform: "Polymarket",
+      title: "Will 1 Fed rate cut happen in 2026?",
+      endDate: "2027-01-01",
+      prob: 0.0105,
+    });
+    const out = findCrossVenue([kalshi, polyOne]);
+    expect(out).toHaveLength(0);
+  });
+
+  it("does not pair the any-cut market with an emergency-cut market", () => {
+    const kalshi = m({
+      platform: "Kalshi",
+      title: "Will the Federal Reserve cut rates before 2027?",
+      endDate: "2027-01-01",
+      prob: 0.054,
+    });
+    const polyEmergency = m({
+      platform: "Polymarket",
+      title: "Fed emergency rate cut before 2027?",
+      endDate: "2027-01-01",
+      prob: 0.0335,
+    });
+    const out = findCrossVenue([kalshi, polyEmergency]);
+    expect(out).toHaveLength(0);
+  });
+
+  it("does not pair a Bank of England 'raise before 2027' market with the Fed any-cut key", () => {
+    const boe = m({
+      platform: "Kalshi",
+      title: "Will the Bank of England raise the Bank Rate before 2027?",
+      endDate: "2027-01-01",
+      prob: 0.78,
+    });
+    const poly = m({
+      platform: "Polymarket",
+      title: "Will no Fed rate cuts happen in 2026?",
+      endDate: "2027-01-01",
+      prob: 0.965,
+    });
+    const out = findCrossVenue([boe, poly]);
+    expect(out).toHaveLength(0);
+  });
+
+  it("still pairs the existing hold-on-both-venues market correctly, unaffected by the new family (regression)", () => {
+    const kalshi = m({
+      platform: "Kalshi",
+      title: "Will the Federal Reserve Hike rates by 0bps at their October 2026 meeting?",
+      endDate: "2026-10-28",
+      prob: 0.48,
+    });
+    const poly = m({
+      platform: "Polymarket",
+      title: "Will there be no change in Fed interest rates after the October 2026 meeting?",
+      endDate: "2026-10-29",
+      prob: 0.455,
+    });
+    const out = findCrossVenue([kalshi, poly]);
+    expect(out).toHaveLength(1);
+    expect(out[0].action).toBe("hold");
+    expect(out[0].kalshiInverted).toBe(false);
+    expect(out[0].polymarketInverted).toBe(false);
+  });
+
+  it("the six pairs findCrossVenue produces today are unchanged in count and are all non-inverted (no polarity family touches them)", () => {
+    const kalshi1 = m({ platform: "Kalshi", title: "Will the Federal Reserve Hike rates by 25bps at their July 2026 meeting?", endDate: "2026-07-29", prob: 0.04 });
+    const poly1 = m({ platform: "Polymarket", title: "Will the Fed increase interest rates by 25 bps after the July 2026 meeting?", endDate: "2026-07-30", prob: 0.0385 });
+    const kalshi2 = m({ platform: "Kalshi", title: "Will the Federal Reserve Hike rates by 0bps at their July 2026 meeting?", endDate: "2026-07-29", prob: 0.95 });
+    const poly2 = m({ platform: "Polymarket", title: "Will there be no change in Fed interest rates after the July 2026 meeting?", endDate: "2026-07-30", prob: 0.9585 });
+    const out = findCrossVenue([kalshi1, poly1, kalshi2, poly2]);
+    expect(out).toHaveLength(2);
+    for (const pair of out) {
+      expect(pair.kalshiInverted).toBe(false);
+      expect(pair.polymarketInverted).toBe(false);
+    }
   });
 });

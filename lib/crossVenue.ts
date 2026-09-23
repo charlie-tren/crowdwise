@@ -40,10 +40,20 @@ export interface CrossVenuePair {
   bps?: number;
   kalshi: Market;
   polymarket: Market;
-  kalshiProb: number;
-  polymarketProb: number;
-  divergence: number; // |kalshiProb - polymarketProb|, 0..1
+  kalshiProb: number; // comparable probability - polarity already applied
+  polymarketProb: number; // comparable probability - polarity already applied
+  kalshiInverted: boolean; // true iff kalshi's own "yes" is the NEGATION of the proposition
+  polymarketInverted: boolean; // true iff polymarket's own "yes" is the NEGATION of the proposition
+  divergence: number; // |kalshiProb - polymarketProb|, 0..1, both already polarity-adjusted
 }
+
+// "Does this market's own YES correspond to the proposition in `key` being true
+// (1) or to its negation (-1)?" Polarity is a property of each MARKET, never of
+// the proposition/key: two markets that share a key can disagree on which side
+// of the outcome their "yes" represents (e.g. "cuts happen" vs "no cuts
+// happen"), and it must stay out of the key or a "yes" market and a "no" market
+// on the same outcome could never land in the same bucket to be compared.
+export type Polarity = 1 | -1;
 
 // Collapse "25 bps" / "25bp" / "25 basis points" (any spacing) into a
 // consistent "25bps" token so downstream regexes only need one shape.
@@ -182,11 +192,103 @@ function recessionProposition(m: Market): Proposition | null {
   };
 }
 
+// "At least one Fed cut by <year>" - a family SEPARATE from the meeting-specific
+// hike/cut/hold-by-Nbps propositions above (different key shape, `fed|YYYY|cut|any`
+// vs `fed|YYYY-MM|cut|N`, so the two can never collide). It carries polarity
+// because its two live phrasings sit on OPPOSITE sides of the outcome: Kalshi's
+// "cut rates before <year+1>" markets are themselves "at least one cut", but
+// Polymarket has no matching "at least one" market - only a 0..12+ cut-COUNT
+// ladder, whose zero rung ("no Fed rate cuts happen in <year>") is the outcome's
+// NEGATION, not a restatement of it.
+//
+// Deliberately narrow: matches these two validated phrasings only, never a
+// generic "title contains no/not" rule. A generic negation rule would also fire
+// on "Will there be NO change in Fed interest rates..." (a HOLD proposition,
+// parsed above, that already correctly pairs with a 0bps market) and steal it
+// into this family with the wrong polarity. It also does NOT match the
+// count-ladder's other rungs ("1 Fed rate cut happen in 2026", "12 or more Fed
+// rate cuts happen in 2026", ...): exactly-N is not the negation of at-least-one,
+// only exactly-zero is, and none of those titles contain "no ... cuts happen".
+export interface FedAnyCutProposition {
+  year: string; // e.g. "2026"
+  polarity: Polarity;
+}
+
+export function parseFedAnyCutProposition(m: Market): FedAnyCutProposition | null {
+  if (m.prob == null) return null;
+  if (m.category !== "Rates/Fed") return null;
+
+  const normalized = normalizeBpsPhrasing(m.title.toLowerCase());
+
+  // Same guards as the meeting-specific family: must be the US Federal Reserve -
+  // Kalshi's KXCBRATEHIKE series carries the same "raise ... before 2027" shape
+  // for the Bank of England, Bank of Canada, RBA, Riksbank, SNB and Norges Bank
+  // under this same "Rates/Fed" category, and none of those may share a Fed key -
+  // and must not be a narrower, unmodelled qualifier (an emergency cut is not
+  // "at least one [scheduled] cut").
+  if (!/federal reserve|federal funds|\bfomc\b|\bfed\b/.test(normalized)) return null;
+  if (/\becb\b|european central|bank of (japan|england|russia|canada)|\bboj\b|\bboe\b/.test(normalized)) return null;
+  if (UNMODELLED_FED_QUALIFIER.test(normalized)) return null;
+
+  // "before <YYYY>" means "during <YYYY-1>": a cut before 2027 is a 2026 cut. It
+  // must key to 2026, never to 2027.
+  const before = normalized.match(/\bcut(?:s)?\s+rates\s+before\s+(\d{4})\b/);
+  if (before) {
+    return { year: String(Number(before[1]) - 1), polarity: 1 };
+  }
+
+  const none = normalized.match(/\bno\s+fed\s+rate\s+cuts?\s+happen\s+in\s+(\d{4})\b/);
+  if (none) {
+    return { year: none[1], polarity: -1 };
+  }
+
+  return null;
+}
+
+function fedAnyCutProposition(m: Market): { prop: Proposition; polarity: Polarity } | null {
+  const parsed = parseFedAnyCutProposition(m);
+  if (!parsed) return null;
+  return {
+    prop: {
+      type: "fed",
+      key: `fed|${parsed.year}|cut|any`,
+      label: `At least one Fed cut in ${parsed.year}`,
+      action: "cut",
+    },
+    polarity: parsed.polarity,
+  };
+}
+
 // Dispatch a market to whichever outcome parser recognises it, else null.
 // Add new proposition families here (CPI thresholds, rate-cut counts, shutdowns)
 // once validated against live data - each MUST key on the outcome, not tokens.
+//
+// Polarity-bearing families (currently only `fedAnyCutProposition`) are
+// deliberately NOT included here - this dispatcher hands back a bare
+// Proposition with no polarity attached, and a polarity-blind consumer (e.g.
+// `matchMetaculusToMarkets` in metaculus.ts, which compares raw `prob` values)
+// would silently reintroduce the false-pair bug this file guards against, just
+// one hop over. `parsePropositionWithPolarity` below is the polarity-aware
+// dispatcher and is what `findCrossVenue` uses.
 export function parseProposition(m: Market): Proposition | null {
   return fedProposition(m) ?? recessionProposition(m);
+}
+
+interface ParsedMarket {
+  prop: Proposition;
+  polarity: Polarity;
+}
+
+function parsePropositionWithPolarity(m: Market): ParsedMarket | null {
+  const fed = fedProposition(m);
+  if (fed) return { prop: fed, polarity: 1 };
+  const recession = recessionProposition(m);
+  if (recession) return { prop: recession, polarity: 1 };
+  return fedAnyCutProposition(m);
+}
+
+function comparableProb(prob: number, polarity: Polarity): number {
+  return polarity === -1 ? 1 - prob : prob;
 }
 
 function bestByVolume(markets: Market[]): Market {
@@ -199,17 +301,23 @@ export function findCrossVenue(markets: Market[]): CrossVenuePair[] {
   const kalshiByKey = new Map<string, Market[]>();
   const polyByKey = new Map<string, Market[]>();
   const propByKey = new Map<string, Proposition>();
+  // Polarity is per-MARKET, not per-key (see `Polarity`'s doc comment above), so
+  // it is tracked against the specific Market object here and looked up again
+  // below once `bestByVolume` has picked the one market per venue per key that
+  // actually makes the pair - that market's own polarity is the one that applies.
+  const polarityByMarket = new Map<Market, Polarity>();
 
   for (const m of markets) {
     if (m.platform !== "Kalshi" && m.platform !== "Polymarket") continue;
-    const prop = parseProposition(m);
-    if (!prop) continue;
+    const parsed = parsePropositionWithPolarity(m);
+    if (!parsed) continue;
 
-    propByKey.set(prop.key, prop);
+    propByKey.set(parsed.prop.key, parsed.prop);
+    polarityByMarket.set(m, parsed.polarity);
     const bucket = m.platform === "Kalshi" ? kalshiByKey : polyByKey;
-    const list = bucket.get(prop.key);
+    const list = bucket.get(parsed.prop.key);
     if (list) list.push(m);
-    else bucket.set(prop.key, [m]);
+    else bucket.set(parsed.prop.key, [m]);
   }
 
   const pairs: CrossVenuePair[] = [];
@@ -220,8 +328,10 @@ export function findCrossVenue(markets: Market[]): CrossVenuePair[] {
     const prop = propByKey.get(key)!;
     const kalshi = bestByVolume(kalshiMarkets);
     const polymarket = bestByVolume(polyMarkets);
-    const kalshiProb = kalshi.prob as number;
-    const polymarketProb = polymarket.prob as number;
+    const kalshiPolarity = polarityByMarket.get(kalshi) ?? 1;
+    const polymarketPolarity = polarityByMarket.get(polymarket) ?? 1;
+    const kalshiProb = comparableProb(kalshi.prob as number, kalshiPolarity);
+    const polymarketProb = comparableProb(polymarket.prob as number, polymarketPolarity);
 
     pairs.push({
       type: prop.type,
@@ -234,6 +344,8 @@ export function findCrossVenue(markets: Market[]): CrossVenuePair[] {
       polymarket,
       kalshiProb,
       polymarketProb,
+      kalshiInverted: kalshiPolarity === -1,
+      polymarketInverted: polymarketPolarity === -1,
       divergence: Math.abs(kalshiProb - polymarketProb),
     });
   }
