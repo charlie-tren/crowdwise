@@ -1,24 +1,19 @@
 import type { Metadata } from "next";
-import { ScenarioBuilder } from "@/components/ScenarioBuilder";
-import { ThesisBaskets } from "@/components/ThesisBaskets";
+import { ScenarioMap } from "@/components/scenarioMap/ScenarioMap";
 import { fetchTopMarkets } from "@/lib/board";
 
 export const revalidate = 300;
 export const maxDuration = 60;
 export const metadata: Metadata = {
-  title: "Scenario Builder · Crowdwise",
-  // Paired with the lede in components/ScenarioBuilder.tsx - keep identical.
+  title: "Scenario Map · Crowdwise",
+  // The page carries no standfirst: this sentence exists for a share card, where
+  // a reader arriving cold needs it, and nobody on the page has to read it.
   description:
-    "Pick two or more markets to read the joint probability of all resolving YES, and of at least one.",
+    "Build a macro view as a map: live market prices, your own estimates, and the formulas that combine them.",
   alternates: { canonical: "/scenario" },
 };
 
 export default async function ScenarioPage() {
   const markets = await fetchTopMarkets();
-  return (
-    <>
-      <ThesisBaskets markets={markets} />
-      <ScenarioBuilder markets={markets} />
-    </>
-  );
+  return <ScenarioMap markets={markets} />;
 }

@@ -14,6 +14,36 @@
 
 ---
 
+## Corrections applied during execution
+
+Reviews found defects in the code this plan supplied. All are fixed on the branch;
+the task text above has been patched where a re-run could reintroduce them. Recorded
+here so the reasoning is not lost:
+
+- **A NaN market price resolved as a confident 0%** (commit `acc4ef3`). `priceById` was
+  built under `if (m.prob != null)` and pass 1 checked `if (p == null)`, and neither
+  catches NaN, so the clamp turned it into a tight, confident zero with no reason. This
+  is precisely the failure the feature exists to prevent. The test written to catch it
+  asserted only `p50 == null || Number.isFinite(p50)`, which passes on 0, so it could
+  never have come out negative. Both fixed, and the tightened test was proved to go red
+  against the unfixed code before the fix went back in.
+- **`REF_RULES[n.op]?.(...) ?? "Unknown operator"`** fired on `null`, the value a shape
+  rule returns to mean the shape is fine, so every valid operator reported itself
+  unknown (commit `c33e571`).
+- **The `mix` rule checked arity before the weight count**, hiding the specific fault
+  behind the vaguer one (commit `c33e571`).
+- **Cycle detection gives an imprecise REASON** where a node shares a convergence point
+  with an already-explored cycle: it reads "Depends on an unresolved input" rather than
+  "Circular". It is still correctly unresolved, so no figure is ever wrong. Left as is
+  rather than rewritten to Tarjan's SCC, with the limitation stated in the comment and
+  pinned by a test.
+- **`layoutMap`'s edge ARRAY order** depended on input node order even though its node
+  order did not. Made order-independent, and the determinism test now asserts it.
+- **`depends` was verified at one interior point**, where a swap of the two conditionals
+  still gives a plausible number. Boundary tests at condition 0 and 1 added.
+
+---
+
 ## File structure (locked before tasks)
 
 ```
@@ -221,7 +251,7 @@ export function percentile(xs: number[], q: number): number | null {
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `npm test -- lib/scenarioMap/rng.test.ts`
-Expected: PASS, 7 tests.
+Expected: PASS, 8 tests.
 
 - [ ] **Step 6: Commit**
 
@@ -405,14 +435,16 @@ const REF_RULES: Record<string, (refs: string[], weights?: number[]) => string |
     refs.length === 3 ? null : "Depends takes exactly three inputs: the condition and the two conditionals",
   and: (refs) => (refs.length >= 2 ? null : "AND takes at least two inputs"),
   or: (refs) => (refs.length >= 2 ? null : "OR takes at least two inputs"),
+  // Weights first: a mismatched weight count is the more specific fault, and
+  // checking arity first hides it behind "takes at least two inputs".
   mix: (refs, weights) =>
-    refs.length >= 2
-      ? !weights || weights.length !== refs.length
-        ? "Mix needs one weight per input"
+    !weights || weights.length !== refs.length
+      ? "Mix needs one weight per input"
+      : refs.length < 2
+        ? "Mix takes at least two inputs"
         : weights.some((w) => w < 0) || weights.reduce((a, b) => a + b, 0) <= 0
           ? "Mix weights must be positive"
-          : null
-      : "Mix takes at least two inputs",
+          : null,
 };
 
 export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult {
@@ -428,6 +460,12 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
       const p = priceById.get(n.marketId);
       if (p == null) {
         res.set(n.id, { status: "unresolved", reason: "No live market on the board" });
+      } else if (!Number.isFinite(p)) {
+        // NOT covered by `p == null`: loose equality treats NaN as a usable number,
+        // so without this the clamp turns it into a confident 0% with a zero-width
+        // range and no reason. A different fact from an absent market, so a
+        // different sentence.
+        res.set(n.id, { status: "unresolved", reason: "Market price is not a usable number" });
       } else {
         res.set(n.id, { status: "ok", value: n.side === "no" ? 1 - p : p });
       }
@@ -487,7 +525,11 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
       if (inCycle.has(n.id)) {
         r = { status: "unresolved", reason: "Circular: this node feeds itself" };
       } else {
-        const shape = REF_RULES[n.op]?.(n.refs, n.weights) ?? `Unknown operator ${n.op}`;
+        // NOT `REF_RULES[n.op]?.(...) ?? "Unknown operator"`: a rule returns null
+        // to mean "this shape is fine", and ?? fires on null as well as undefined,
+        // so every valid operator would report itself unknown.
+        const rule = REF_RULES[n.op];
+        const shape = rule ? rule(n.refs, n.weights) : `Unknown operator ${n.op}`;
         if (shape) r = { status: "unresolved", reason: shape };
         else if (n.refs.some((id) => !byId.has(id))) r = { status: "unresolved", reason: "Missing input" };
         else if (n.refs.some((id) => res.get(id)?.status === "unresolved"))
@@ -635,6 +677,25 @@ describe("evaluateMap", () => {
     expect(evaluateMap(m, []).get("f")!.p50).toBe(evaluateMap(m, []).get("f")!.p50);
   });
 
+  it("never lets a non-finite value reach a percentile", () => {
+    // An out-of-order range is rejected by resolveNodes, so reach the clamp the
+    // only other way: a market whose price is already broken.
+    const bad = [{
+      id: "k1", platform: "Kalshi" as const, title: "x", category: "Rates/Fed" as const,
+      prob: Number.NaN, volume: 1, endDate: "2026-12-31", status: "active", series: "KX", event: "",
+    }];
+    const r = evaluateMap(
+      map({ id: "m", kind: "market", label: "M", marketId: "k1", side: "yes" }),
+      bad,
+    );
+    // Assert the STATUS, not just that the figure is finite: the broken version
+    // returned a perfectly finite 0, so `Number.isFinite(p50)` passed on it.
+    const v = r.get("m")!;
+    expect(v.status).toBe("unresolved");
+    expect(v.reason).toMatch(/not a usable number/i);
+    expect([v.p50, v.p10, v.p90]).toEqual([null, null, null]);
+  });
+
   it("keeps every result inside 0 to 1", () => {
     const r = evaluateMap(
       map(
@@ -662,7 +723,13 @@ Expected: FAIL, `evaluateMap` is not exported.
 Append to `lib/scenarioMap/engine.ts`:
 
 ```ts
-const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
+// NaN-safe on purpose: `x < 0 ? 0 : x > 1 ? 1 : x` passes NaN straight through,
+// because both comparisons are false for it. A single NaN then reaches percentile,
+// where it corrupts the sort (a comparator returning NaN leaves the array in an
+// arbitrary order) and the figure comes out wrong with nothing to say so. The
+// input validation in resolveNodes should make this unreachable; this is the
+// backstop for when it is not.
+const clamp01 = (x: number) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
 
 /**
  * Resolve, then sample. Only resolvable nodes are sampled: an unresolved node's
@@ -735,7 +802,7 @@ export function evaluateMap(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test -- lib/scenarioMap/engine.test.ts`
-Expected: PASS, 18 tests total in the file.
+Expected: PASS, 19 tests total in the file (9 from Task 2, 10 here).
 
 - [ ] **Step 5: Commit**
 

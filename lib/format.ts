@@ -18,6 +18,26 @@ export function pct(p: number | null, decimals = 1): string {
   return `${(p * 100).toFixed(decimals)}%`;
 }
 
+/**
+ * Whole-percent, like pct(p, 0), except it never rounds a genuinely non-zero
+ * probability down to "0%" nor a genuinely sub-certain one up to "100%":
+ * either string is a claim (impossible, certain) the engine did not make.
+ * A genuine 0 or 1 still renders "0%" / "100%", because those ARE honest.
+ *
+ * Scoped to the Scenario Map only (MapView, MapOutline, NodeList). pct()
+ * itself is untouched: every other caller on the site - the board, the
+ * cross-venue page, the treemap, the headline odds strip - keeps today's
+ * plain whole-percent rounding.
+ */
+export function pctScenario(p: number | null): string {
+  if (p == null) return pct(p);
+  const whole = Math.round(p * 100);
+  if ((p !== 0 && whole === 0) || (p !== 1 && whole === 100)) {
+    return `${(p * 100).toFixed(1)}%`;
+  }
+  return `${whole}%`;
+}
+
 // Single-hue (blue) sequential ramp. Probability = magnitude, NOT sentiment.
 // No green/yellow/red. The number itself stays neutral (--text); this drives
 // meter bars + chart fills only.
