@@ -13,9 +13,55 @@ const full: ScenarioMap = {
   ],
 };
 
+const fiveOps: ScenarioMap = {
+  id: "five", name: "Five ops",
+  nodes: [
+    { id: "m1", kind: "market", label: "Fed cuts", marketId: "KX-1", side: "no" },
+    { id: "i1", kind: "input", label: "My read", low: 0.2, likely: 0.35, high: 0.6, source: "Charlie" },
+    { id: "a", kind: "formula", label: "And", op: "and", refs: ["m1", "i1"] },
+    { id: "o", kind: "formula", label: "Or", op: "or", refs: ["m1", "i1"] },
+    { id: "n", kind: "formula", label: "Not", op: "not", refs: ["m1"] },
+    { id: "x", kind: "formula", label: "Mix", op: "mix", refs: ["m1", "i1"], weights: [2, 1] },
+    { id: "d", kind: "formula", label: "Depends", op: "depends", refs: ["m1", "i1", "a"] },
+  ],
+};
+
 describe("encodeMap / decodeMap", () => {
   it("round-trips every node kind", () => {
     expect(decodeMap(encodeMap(full))).toEqual(full);
+  });
+
+  it("round-trips a genuine map that uses all five operators, unchanged, once op is validated", () => {
+    // Pinned so the new op-whitelist in isNode cannot be tightened into
+    // rejecting a real map: every legitimate operator must still survive
+    // the trip it always has.
+    expect(decodeMap(encodeMap(fiveOps))).toEqual(fiveOps);
+  });
+
+  it("rejects a formula node whose op names an inherited Object.prototype member", () => {
+    // The same crafted-link attack the engine has to survive on its own (see
+    // engine.test.ts): here it should never even reach the engine, because
+    // decodeMap is the trust boundary and an op outside the five real
+    // operators is malformed input, same as a missing field.
+    const bad = {
+      id: "x", name: "x",
+      nodes: [
+        { id: "a", kind: "market", label: "A", marketId: "ma", side: "yes" },
+        { id: "f", kind: "formula", label: "F", op: "hasOwnProperty", refs: ["a"] },
+      ],
+    };
+    expect(decodeMap(encodeMap(bad as unknown as ScenarioMap))).toBeNull();
+  });
+
+  it("rejects a payload with an absurd node count rather than admitting it for the engine to deal with", () => {
+    const huge: ScenarioMap = {
+      id: "huge", name: "huge",
+      nodes: Array.from({ length: 50_000 }, (_, i) => ({
+        id: `n${i}`, kind: "input" as const, label: "x",
+        low: 0, likely: 0, high: 0, source: "",
+      })),
+    };
+    expect(decodeMap(encodeMap(huge))).toBeNull();
   });
 
   it("emits a URL-safe string with no padding", () => {

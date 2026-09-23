@@ -1,7 +1,21 @@
 import { deflateSync, inflateSync, strToU8, strFromU8 } from "fflate";
+import { KNOWN_OPERATORS } from "./engine";
 import type { MapNode, ScenarioMap } from "./types";
 
 export const STORAGE_KEY = "crowdwise.scenarioMaps.v1";
+
+// fflate's inflateSync has no output-size limit, and deflate can expand
+// roughly 1000 to 1: a short, cheaply-crafted hash can demand tens of
+// megabytes of JSON, which then hands layoutMap and MapOutline (neither of
+// which caps recursion depth) thousands of nodes to lay out and render,
+// hanging the tab or overflowing the stack. A bad link must fail cleanly,
+// not slowly. These caps are sized generously against a real map - the
+// built-ins run to a handful of nodes, and even a large hand-built one is
+// unlikely to reach a few dozen - while still keeping worst-case work bounded
+// to something that finishes instantly.
+const MAX_ENCODED_CHARS = 20_000; // b64url hash length, checked before inflating at all
+const MAX_JSON_CHARS = 2_000_000; // decompressed JSON text length (chars), checked before JSON.parse
+const MAX_NODES = 500; // parsed node count, checked before anything walks the graph
 
 const toB64url = (b: Uint8Array): string => {
   let s = "";
@@ -43,7 +57,13 @@ const isNode = (n: unknown): n is MapNode => {
   if (o.kind === "input")
     return ["low", "likely", "high"].every((k) => typeof o[k] === "number") && typeof o.source === "string";
   if (o.kind === "formula") {
-    if (typeof o.op !== "string" || !Array.isArray(o.refs)) return false;
+    // Restricted to the five real operators, not just "is a string": engine.ts
+    // is the authoritative guard against a hostile op (see KNOWN_OPERATORS
+    // there for why), but this is the trust boundary, and a payload naming
+    // something else is malformed input like any other - reject it here
+    // cleanly rather than admit it for the engine to deal with downstream.
+    if (typeof o.op !== "string" || !(KNOWN_OPERATORS as string[]).includes(o.op) || !Array.isArray(o.refs))
+      return false;
     if (o.weights !== undefined && (!Array.isArray(o.weights) || !o.weights.every((w) => typeof w === "number" && Number.isFinite(w))))
       return false;
     return true;
@@ -53,16 +73,18 @@ const isNode = (n: unknown): n is MapNode => {
 
 /** Null on anything malformed. A bad link must not take the page down with it. */
 export function decodeMap(hash: string): ScenarioMap | null {
-  if (!hash) return null;
+  if (!hash || hash.length > MAX_ENCODED_CHARS) return null;
   try {
     const bytes = fromB64url(hash);
     const json = (() => {
       try { return strFromU8(inflateSync(bytes)); } catch { return strFromU8(bytes); }
     })();
+    if (json.length > MAX_JSON_CHARS) return null;
     const parsed: unknown = JSON.parse(json);
     if (!parsed || typeof parsed !== "object") return null;
     const m = parsed as Record<string, unknown>;
     if (typeof m.id !== "string" || typeof m.name !== "string" || !Array.isArray(m.nodes)) return null;
+    if (m.nodes.length > MAX_NODES) return null;
     if (!m.nodes.every(isNode)) return null;
     return { id: m.id, name: m.name, nodes: m.nodes as MapNode[] };
   } catch {

@@ -125,6 +125,42 @@ describe("resolveNodes", () => {
     expect(r.get("w")!.reason).toMatch(/one weight/i);
   });
 
+  it("an unrecognised op is reported as unknown, not thrown", () => {
+    // The plan formula-op string reaches this switch straight from a share
+    // link (see codec.ts): a genuinely new/misspelled op must resolve to the
+    // ordinary "unknown operator" reason, same as any other malformed node.
+    const r = resolveNodes(
+      map({ id: "f", kind: "formula", label: "F", op: "xor", refs: [] } as unknown as ScenarioMap["nodes"][number]),
+      [],
+    );
+    expect(r.get("f")!.status).toBe("unresolved");
+    expect(r.get("f")!.reason).toMatch(/unknown operator xor/i);
+  });
+
+  it.each(["hasOwnProperty", "valueOf", "toString", "constructor"])(
+    "an op naming an inherited Object.prototype member ('%s') does not throw and is reported as unknown, " +
+      "not invoked as a function",
+    (op) => {
+      // A crafted share link can put any string in `op`. REF_RULES used to be a
+      // plain object literal, so `REF_RULES[op]` for one of these names resolved
+      // to a real inherited method and got called with (refs, weights) as its
+      // arguments: hasOwnProperty/valueOf threw (crashing the whole page's
+      // render, not just this node), toString silently returned "[object
+      // Undefined]", and constructor returned the Array constructor invoked as
+      // a function, i.e. an array, into a field the type system says is a
+      // string. All four must instead behave exactly like any other unknown
+      // operator name.
+      const f = { id: "f", kind: "formula", label: "F", op, refs: [] } as unknown as ScenarioMap["nodes"][number];
+      let r: ReturnType<typeof resolveNodes> | undefined;
+      expect(() => { r = resolveNodes(map(f), []); }).not.toThrow();
+      const res = r!.get("f")!;
+      expect(res.status).toBe("unresolved");
+      expect(typeof res.reason).toBe("string");
+      expect(Array.isArray(res.reason)).toBe(false);
+      expect(res.reason).toMatch(/unknown operator/i);
+    },
+  );
+
   it("returns a topological order with inputs before the formulas that read them", () => {
     const m = map(
       { id: "f", kind: "formula", label: "F", op: "and", refs: ["a", "b"] },

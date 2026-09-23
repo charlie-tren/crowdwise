@@ -1,5 +1,5 @@
 import type { Market } from "@/lib/types";
-import type { MapNode, NodeResult, ScenarioMap } from "./types";
+import type { MapNode, NodeResult, Operator, ScenarioMap } from "./types";
 import { makeRng, percentile, sampleTriangular } from "./rng";
 
 /**
@@ -26,13 +26,25 @@ export interface ResolveResult {
   order: string[];
 }
 
-const REF_RULES: Record<string, (refs: string[], weights?: number[]) => string | null> = {
-  not: (refs) => (refs.length === 1 ? null : "NOT takes exactly one input"),
-  depends: (refs) =>
-    refs.length === 3 ? null : "Depends takes exactly three inputs: the condition and the two conditionals",
-  and: (refs) => (refs.length >= 2 ? null : "AND takes at least two inputs"),
-  or: (refs) => (refs.length >= 2 ? null : "OR takes at least two inputs"),
-  mix: (refs, weights) => {
+// A Map, not a plain object literal: `n.op` can arrive verbatim from a share
+// link (see codec.ts), and a plain object's lookup falls through to
+// Object.prototype for a name like "hasOwnProperty", "valueOf", "toString" or
+// "constructor" - resolving to a real inherited function that then gets
+// invoked as if it were an operator rule. hasOwnProperty/valueOf throw on the
+// call below (crashing the whole page's render, not just this node), toString
+// silently returns "[object Undefined]", and constructor returns an array
+// into a field the type system says is a string. A Map has no prototype
+// chain to fall into: `.get` on an absent key is always exactly undefined,
+// for any string at all, which is what makes this the authoritative guard -
+// a map built directly in the UI never passes through the codec's validation,
+// so this is the only check that protects every path, not just share links.
+const REF_RULES = new Map<Operator, (refs: string[], weights?: number[]) => string | null>([
+  ["not", (refs) => (refs.length === 1 ? null : "NOT takes exactly one input")],
+  ["depends", (refs) =>
+    refs.length === 3 ? null : "Depends takes exactly three inputs: the condition and the two conditionals"],
+  ["and", (refs) => (refs.length >= 2 ? null : "AND takes at least two inputs")],
+  ["or", (refs) => (refs.length >= 2 ? null : "OR takes at least two inputs")],
+  ["mix", (refs, weights) => {
     if (!weights || weights.length !== refs.length) return "Mix needs one weight per input";
     if (refs.length < 2) return "Mix takes at least two inputs";
     // Per-weight finiteness first: catches Infinity/NaN individually. This is
@@ -48,8 +60,16 @@ const REF_RULES: Record<string, (refs: string[], weights?: number[]) => string |
     if (!Number.isFinite(sum)) return "Mix weights add up to a number too large to use";
     if (sum <= 0) return "Mix weights must be positive";
     return null;
-  },
-};
+  }],
+]);
+
+/**
+ * The five real operator names, derived from REF_RULES so there is one list,
+ * not two that can drift apart. codec.ts imports this to reject a formula
+ * node's op at the trust boundary, before an untrusted share link's payload
+ * is ever admitted as a map.
+ */
+export const KNOWN_OPERATORS: Operator[] = Array.from(REF_RULES.keys());
 
 export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult {
   const byId = new Map<string, MapNode>(map.nodes.map((n) => [n.id, n]));
@@ -143,7 +163,7 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
       if (inCycle.has(n.id)) {
         r = { status: "unresolved", reason: "Circular: this node feeds itself" };
       } else {
-        const rule = REF_RULES[n.op];
+        const rule = REF_RULES.get(n.op);
         const shape = rule ? rule(n.refs, n.weights) : `Unknown operator ${n.op}`;
         if (shape) r = { status: "unresolved", reason: shape };
         else if (n.refs.some((id) => !byId.has(id))) r = { status: "unresolved", reason: "Missing input" };
