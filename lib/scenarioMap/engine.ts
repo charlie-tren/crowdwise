@@ -145,3 +145,78 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
 
   return { get: (id: string) => res.get(id), order };
 }
+
+// NaN-safe on purpose: `x < 0 ? 0 : x > 1 ? 1 : x` passes NaN straight through,
+// because both comparisons are false for it. A single NaN then reaches percentile,
+// where it corrupts the sort (a comparator returning NaN leaves the array in an
+// arbitrary order) and the figure comes out wrong with nothing to say so. The
+// input validation in resolveNodes should make this unreachable; this is the
+// backstop for when it is not.
+const clamp01 = (x: number) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
+
+/**
+ * Resolve, then sample. Only resolvable nodes are sampled: an unresolved node's
+ * status never changes between draws, so deciding it once is both cheaper and
+ * the only way a reason survives to the reader.
+ */
+export function evaluateMap(
+  map: ScenarioMap,
+  markets: Market[],
+  draws = DRAWS,
+): Map<string, NodeResult> {
+  const resolved = resolveNodes(map, markets);
+  const byId = new Map<string, MapNode>(map.nodes.map((n) => [n.id, n]));
+  const samples = new Map<string, number[]>();
+  for (const id of resolved.order) samples.set(id, []);
+
+  const rng = makeRng(SEED);
+  const draw = new Map<string, number>();
+
+  for (let d = 0; d < draws; d++) {
+    for (const id of resolved.order) {
+      const n = byId.get(id)!;
+      let v: number;
+      if (n.kind === "market") {
+        v = resolved.get(id)!.value!;
+      } else if (n.kind === "input") {
+        v = sampleTriangular(n.low, n.likely, n.high, rng());
+      } else {
+        const r = n.refs.map((ref) => draw.get(ref)!);
+        switch (n.op) {
+          case "and": v = r.reduce((acc, p) => acc * p, 1); break;
+          case "or": v = 1 - r.reduce((acc, p) => acc * (1 - p), 1); break;
+          case "not": v = 1 - r[0]; break;
+          case "mix": {
+            const w = n.weights!;
+            const total = w.reduce((a, b) => a + b, 0);
+            v = r.reduce((acc, p, i) => acc + p * w[i], 0) / total;
+            break;
+          }
+          case "depends": v = r[0] * r[1] + (1 - r[0]) * r[2]; break;
+          default: v = 0;
+        }
+      }
+      v = clamp01(v);
+      draw.set(id, v);
+      samples.get(id)!.push(v);
+    }
+  }
+
+  const out = new Map<string, NodeResult>();
+  for (const n of map.nodes) {
+    const r = resolved.get(n.id)!;
+    if (r.status !== "ok") {
+      out.set(n.id, { id: n.id, status: "unresolved", reason: r.reason, p50: null, p10: null, p90: null });
+      continue;
+    }
+    const xs = samples.get(n.id) ?? [];
+    out.set(n.id, {
+      id: n.id,
+      status: "ok",
+      p50: percentile(xs, 0.5),
+      p10: percentile(xs, 0.1),
+      p90: percentile(xs, 0.9),
+    });
+  }
+  return out;
+}
