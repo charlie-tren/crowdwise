@@ -104,7 +104,22 @@ export function NodeList({
                 it, so the track's own focus/click never toggles the row open. */}
             {node.kind === "input" && (
               <div className="px-4 pb-3">
-                <svg width="100%" height={TRACK_H} viewBox={`0 0 ${TRACK_UNITS} ${TRACK_H}`} preserveAspectRatio="none">
+                {/* overflow: visible - without it this SVG clips to its own
+                    16px-tall viewport (the browser default for svg is
+                    overflow: hidden), which would silently cut the drag
+                    handle's enlarged touch target (see HIT_R in
+                    EstimateTrack.tsx) down to ~16px tall here, right where a
+                    real thumb needs the full target most: this row is the
+                    only place the control appears on a phone. Nothing else
+                    in the track draws outside the nominal 16px box, so this
+                    has no other visual effect. */}
+                <svg
+                  width="100%"
+                  height={TRACK_H}
+                  viewBox={`0 0 ${TRACK_UNITS} ${TRACK_H}`}
+                  preserveAspectRatio="none"
+                  style={{ overflow: "visible" }}
+                >
                   <EstimateTrack
                     node={node}
                     onChange={(range) => replace(node.id, range as Partial<MapNode>)}
