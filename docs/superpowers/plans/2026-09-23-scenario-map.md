@@ -221,7 +221,7 @@ export function percentile(xs: number[], q: number): number | null {
 - [ ] **Step 5: Run the test to verify it passes**
 
 Run: `npm test -- lib/scenarioMap/rng.test.ts`
-Expected: PASS, 7 tests.
+Expected: PASS, 8 tests.
 
 - [ ] **Step 6: Commit**
 
@@ -405,14 +405,16 @@ const REF_RULES: Record<string, (refs: string[], weights?: number[]) => string |
     refs.length === 3 ? null : "Depends takes exactly three inputs: the condition and the two conditionals",
   and: (refs) => (refs.length >= 2 ? null : "AND takes at least two inputs"),
   or: (refs) => (refs.length >= 2 ? null : "OR takes at least two inputs"),
+  // Weights first: a mismatched weight count is the more specific fault, and
+  // checking arity first hides it behind "takes at least two inputs".
   mix: (refs, weights) =>
-    refs.length >= 2
-      ? !weights || weights.length !== refs.length
-        ? "Mix needs one weight per input"
+    !weights || weights.length !== refs.length
+      ? "Mix needs one weight per input"
+      : refs.length < 2
+        ? "Mix takes at least two inputs"
         : weights.some((w) => w < 0) || weights.reduce((a, b) => a + b, 0) <= 0
           ? "Mix weights must be positive"
-          : null
-      : "Mix takes at least two inputs",
+          : null,
 };
 
 export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult {
@@ -487,7 +489,11 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
       if (inCycle.has(n.id)) {
         r = { status: "unresolved", reason: "Circular: this node feeds itself" };
       } else {
-        const shape = REF_RULES[n.op]?.(n.refs, n.weights) ?? `Unknown operator ${n.op}`;
+        // NOT `REF_RULES[n.op]?.(...) ?? "Unknown operator"`: a rule returns null
+        // to mean "this shape is fine", and ?? fires on null as well as undefined,
+        // so every valid operator would report itself unknown.
+        const rule = REF_RULES[n.op];
+        const shape = rule ? rule(n.refs, n.weights) : `Unknown operator ${n.op}`;
         if (shape) r = { status: "unresolved", reason: shape };
         else if (n.refs.some((id) => !byId.has(id))) r = { status: "unresolved", reason: "Missing input" };
         else if (n.refs.some((id) => res.get(id)?.status === "unresolved"))
@@ -635,6 +641,21 @@ describe("evaluateMap", () => {
     expect(evaluateMap(m, []).get("f")!.p50).toBe(evaluateMap(m, []).get("f")!.p50);
   });
 
+  it("never lets a non-finite value reach a percentile", () => {
+    // An out-of-order range is rejected by resolveNodes, so reach the clamp the
+    // only other way: a market whose price is already broken.
+    const bad = [{
+      id: "k1", platform: "Kalshi" as const, title: "x", category: "Rates/Fed" as const,
+      prob: Number.NaN, volume: 1, endDate: "2026-12-31", status: "active", series: "KX", event: "",
+    }];
+    const r = evaluateMap(
+      map({ id: "m", kind: "market", label: "M", marketId: "k1", side: "yes" }),
+      bad,
+    );
+    const v = r.get("m")!;
+    expect(v.p50 == null || Number.isFinite(v.p50)).toBe(true);
+  });
+
   it("keeps every result inside 0 to 1", () => {
     const r = evaluateMap(
       map(
@@ -662,7 +683,13 @@ Expected: FAIL, `evaluateMap` is not exported.
 Append to `lib/scenarioMap/engine.ts`:
 
 ```ts
-const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
+// NaN-safe on purpose: `x < 0 ? 0 : x > 1 ? 1 : x` passes NaN straight through,
+// because both comparisons are false for it. A single NaN then reaches percentile,
+// where it corrupts the sort (a comparator returning NaN leaves the array in an
+// arbitrary order) and the figure comes out wrong with nothing to say so. The
+// input validation in resolveNodes should make this unreachable; this is the
+// backstop for when it is not.
+const clamp01 = (x: number) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
 
 /**
  * Resolve, then sample. Only resolvable nodes are sampled: an unresolved node's
@@ -735,7 +762,7 @@ export function evaluateMap(
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `npm test -- lib/scenarioMap/engine.test.ts`
-Expected: PASS, 18 tests total in the file.
+Expected: PASS, 19 tests total in the file (9 from Task 2, 10 here).
 
 - [ ] **Step 5: Commit**
 
