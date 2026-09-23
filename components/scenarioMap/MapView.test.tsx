@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { MapView, wrapLabel } from "./MapView";
 import { evaluateMap } from "@/lib/scenarioMap/engine";
 import type { ScenarioMap } from "@/lib/scenarioMap/types";
@@ -216,6 +216,56 @@ describe("MapView measurement fallback", () => {
     const { container } = render(<MapView map={map} results={evaluateMap(map, [])} width={640} />);
     expect(container.querySelectorAll("[data-node]")).toHaveLength(3);
     expect(constructed).toBe(false);
+  });
+});
+
+describe("MapView drag track", () => {
+  function stubTrackRect(width = 100, left = 0) {
+    return vi
+      .spyOn(SVGElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ left, width, top: 0, height: 16, right: left + width, bottom: 16, x: left, y: 0, toJSON() {} });
+  }
+
+  it("gives only the input node a track: none on the market or formula node", () => {
+    const { container } = render(<MapView map={map} results={evaluateMap(map, [])} onChange={vi.fn()} />);
+    // map (top of file) has one input ("a"), one market ("b"), one formula ("f").
+    expect(container.querySelectorAll("[data-estimate-track]")).toHaveLength(1);
+    expect(screen.getAllByRole("slider")).toHaveLength(1);
+  });
+
+  it("dragging the handle calls onChange with a shifted, width-preserving range", async () => {
+    const rectSpy = stubTrackRect(100, 0);
+    const onChange = vi.fn();
+    render(<MapView map={map} results={evaluateMap(map, [])} onChange={onChange} />);
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { clientX: 60, pointerId: 1 }); // fraction 0.6
+    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+
+    expect(onChange).toHaveBeenCalled();
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const edited = next.nodes.find((n) => n.id === "a")!;
+    // node "a" starts with low = likely = high = 0.3 (a zero-width estimate),
+    // so a correct shift-together moves all three to the same new value.
+    expect(edited.kind === "input" && edited.likely).toBeCloseTo(0.6, 1);
+    expect(edited.kind === "input" && edited.low).toBeCloseTo(0.6, 1);
+    expect(edited.kind === "input" && edited.high).toBeCloseTo(0.6, 1);
+    rectSpy.mockRestore();
+  });
+
+  it("does not mutate the map object it was handed", async () => {
+    const rectSpy = stubTrackRect(100, 0);
+    const original = JSON.parse(JSON.stringify(map));
+    render(<MapView map={map} results={evaluateMap(map, [])} onChange={vi.fn()} />);
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { clientX: 90, pointerId: 1 });
+    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+
+    expect(map).toEqual(original);
+    rectSpy.mockRestore();
+  });
+
+  it("renders without an onChange prop, for a read-only caller", () => {
+    expect(() => render(<MapView map={map} results={evaluateMap(map, [])} />)).not.toThrow();
   });
 });
 
