@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MapView, wrapLabel } from "./MapView";
 import { evaluateMap } from "@/lib/scenarioMap/engine";
@@ -125,6 +125,97 @@ describe("wrapLabel", () => {
   it("does not throw on an empty label", () => {
     expect(() => wrapLabel("")).not.toThrow();
     expect(wrapLabel("")).toEqual([]);
+  });
+});
+
+// A real browser was observed laying the container out correctly at 1086px
+// while its ResizeObserver simply never delivered a callback - no error, no
+// message, just a blank panel. These tests cover the synchronous fallback:
+// the first paint must not depend on the observer firing at all.
+describe("MapView measurement fallback", () => {
+  // Captured per-test (not once at describe-body evaluation, which runs
+  // before the file's beforeAll has set the default stub) so each test
+  // restores exactly what it found, and later describe blocks still see
+  // the beforeAll stub.
+  let originalRO: unknown;
+
+  beforeEach(() => {
+    originalRO = (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver;
+  });
+
+  afterEach(() => {
+    (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = originalRO;
+  });
+
+  it("draws the map from a synchronous measurement when the observer never fires", () => {
+    class SilentRO {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = SilentRO;
+
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ width: 900 } as DOMRect);
+
+    const { container } = render(<MapView map={map} results={evaluateMap(map, [])} />);
+    expect(container.querySelectorAll("[data-node]")).toHaveLength(3);
+
+    rectSpy.mockRestore();
+  });
+
+  it("does not throw and still draws when ResizeObserver is entirely undefined", () => {
+    delete (globalThis as unknown as { ResizeObserver?: unknown }).ResizeObserver;
+
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ width: 900 } as DOMRect);
+
+    let container!: HTMLElement;
+    expect(() => {
+      container = render(<MapView map={map} results={evaluateMap(map, [])} />).container;
+    }).not.toThrow();
+    expect(container.querySelectorAll("[data-node]")).toHaveLength(3);
+
+    rectSpy.mockRestore();
+  });
+
+  it("still renders no svg when the synchronous measurement is zero, as with a CSS-hidden container", () => {
+    class SilentRO {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = SilentRO;
+
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ width: 0 } as DOMRect);
+
+    const { container } = render(<MapView map={map} results={evaluateMap(map, [])} />);
+    expect(container.querySelector("svg")).toBeNull();
+
+    rectSpy.mockRestore();
+  });
+
+  it("lets an explicit width win and skips the observer entirely", () => {
+    let constructed = false;
+    class SpyRO {
+      constructor() {
+        constructed = true;
+      }
+      observe() {
+        constructed = true;
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver = SpyRO;
+
+    const { container } = render(<MapView map={map} results={evaluateMap(map, [])} width={640} />);
+    expect(container.querySelectorAll("[data-node]")).toHaveLength(3);
+    expect(constructed).toBe(false);
   });
 });
 

@@ -92,6 +92,22 @@ export function MapView({
   useEffect(() => {
     if (fixedWidth != null || !box.current) return;
     const el = box.current;
+
+    // Measure synchronously first. ResizeObserver is only guaranteed to
+    // deliver its FIRST callback on a later microtask/frame, and it has been
+    // observed inert altogether in at least one real browser (laid out
+    // correctly at 1086px, callback never fired). A degradation path must
+    // degrade to less, never to nothing, so the first paint cannot depend on
+    // the observer firing at all: it reads the element's own box right away,
+    // and the observer only refines that measurement on later changes.
+    setMeasured(el.getBoundingClientRect().width);
+
+    // Some environments do not have ResizeObserver at all. The synchronous
+    // measurement above already covers the initial paint, so skipping the
+    // observer there just means later resizes are not tracked - survivable,
+    // and cheap to guard against.
+    if (typeof ResizeObserver === "undefined") return;
+
     const ro = new ResizeObserver((entries) => setMeasured(entries[0].contentRect.width));
     ro.observe(el);
     return () => ro.disconnect();
