@@ -9,9 +9,35 @@ import type { Market } from "./types";
 
 export type Direction = "above" | "below";
 
+// The unit is a property of the METRIC, never a rendering constant - the bug
+// this fixes was a hardcoded "%" in the component, which read a $116.99 oil
+// strike as a 116.99% probability. Keyed on the exact strings metricOf()
+// returns, so MetricName below is derived from this object rather than
+// duplicated: adding a metric to metricOf() without adding it here is a
+// compile error, and calling formatThreshold() with an unmapped name throws
+// rather than silently rendering a bare number.
+export const METRIC_UNITS = {
+  "CPI inflation": (v: number) => `${v}%`,
+  "Unemployment": (v: number) => `${v}%`,
+  "GDP growth": (v: number) => `${v}%`,
+  "Fed upper bound": (v: number) => `${v}%`,
+  "Fed lower bound": (v: number) => `${v}%`,
+  // Oil thresholds are dollars a barrel, quoted to the cent (116.99, 86.49) -
+  // a percentage's typical one-decimal-or-whole precision would round them.
+  "Oil price": (v: number) => `$${v.toFixed(2)}`,
+} as const satisfies Record<string, (v: number) => string>;
+
+export type MetricName = keyof typeof METRIC_UNITS;
+
+export function formatThreshold(metric: MetricName, threshold: number): string {
+  const fmt = METRIC_UNITS[metric];
+  if (!fmt) throw new Error(`formatThreshold: no unit mapped for metric "${metric}"`);
+  return fmt(threshold);
+}
+
 export interface StrikeMarket {
   market: Market;
-  metric: string;
+  metric: MetricName;
   period: string; // grouping key, "YYYY" or "YYYY-MM"
   threshold: number;
   direction: Direction;
@@ -29,7 +55,7 @@ export interface LadderRung {
 
 export interface StrikeLadder {
   key: string;
-  metric: string;
+  metric: MetricName;
   period: string;
   direction: Direction;
   rungs: LadderRung[];
@@ -43,7 +69,7 @@ const MONTHS = [
 ];
 const MONTH_ABBR = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
-function metricOf(t: string): string | null {
+function metricOf(t: string): MetricName | null {
   if (/\bcpi\b|inflation/.test(t)) return "CPI inflation";
   if (/unemployment|jobless/.test(t)) return "Unemployment";
   if (/\bgdp\b/.test(t)) return "GDP growth";

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { probFill } from "@/lib/format";
-import type { StrikeLadder } from "@/lib/relativeValue";
+import { formatThreshold, type StrikeLadder } from "@/lib/relativeValue";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function periodLabel(period: string): string {
@@ -33,7 +33,7 @@ export function StrikeLadders({ ladders }: { ladders: StrikeLadder[] }) {
               {l.rungs.map((r) => (
                 <li key={r.id} className="flex items-center gap-2">
                   <span className="w-14 shrink-0 text-right text-[12px] tabular-nums text-muted">
-                    {cmp} {r.threshold}%
+                    {cmp} {formatThreshold(l.metric, r.threshold)}
                   </span>
                   <Link
                     href={`/market/${encodeURIComponent(r.id)}`}

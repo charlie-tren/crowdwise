@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseStrike, buildStrikeLadders } from "./relativeValue";
+import { parseStrike, buildStrikeLadders, formatThreshold, METRIC_UNITS } from "./relativeValue";
 import type { Market } from "./types";
 
 let seq = 0;
@@ -183,5 +183,47 @@ describe("buildStrikeLadders", () => {
     const ladders = buildStrikeLadders([...clean, ...dirty]);
     expect(ladders[0].hasViolation).toBe(true);
     expect(ladders[0].metric).toBe("Unemployment");
+  });
+});
+
+describe("formatThreshold", () => {
+  it("renders an oil threshold as a dollar figure, not a percentage", () => {
+    const label = formatThreshold("Oil price", 116.99);
+    expect(label).toBe("$116.99");
+    expect(label).not.toContain("%");
+  });
+
+  it("renders a CPI threshold with a percent sign, exactly as before (no forced decimal)", () => {
+    expect(formatThreshold("CPI inflation", 3.5)).toBe("3.5%");
+    expect(formatThreshold("Unemployment", 5)).toBe("5%");
+  });
+
+  it("keeps two decimal places on an oil threshold even when the source number has one ('.9')", () => {
+    // parseThreshold reads the raw string, so a title quoting "80.9" must still
+    // render as a price, not silently pick up a bare "80.9" with no currency.
+    expect(formatThreshold("Oil price", 80.9)).toBe("$80.90");
+  });
+
+  it("has a unit for every metric name buildStrikeLadders' metricOf can produce", () => {
+    // The canonical list from metricOf's own comment/behaviour. If a metric is
+    // added to metricOf without a matching entry here, this test fails loudly
+    // rather than the page silently rendering a bare, unit-less number.
+    const knownMetrics = [
+      "CPI inflation",
+      "Unemployment",
+      "GDP growth",
+      "Fed upper bound",
+      "Fed lower bound",
+      "Oil price",
+    ];
+    for (const metric of knownMetrics) {
+      expect(Object.keys(METRIC_UNITS)).toContain(metric);
+      expect(() => formatThreshold(metric as keyof typeof METRIC_UNITS, 1)).not.toThrow();
+    }
+  });
+
+  it("throws rather than rendering bare when asked to format an unmapped metric", () => {
+    // @ts-expect-error - deliberately an unmapped metric name
+    expect(() => formatThreshold("Housing starts", 1)).toThrow();
   });
 });
