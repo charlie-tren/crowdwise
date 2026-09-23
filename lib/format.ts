@@ -19,10 +19,11 @@ export function pct(p: number | null, decimals = 1): string {
 }
 
 /**
- * Whole-percent, like pct(p, 0), except it never rounds a genuinely non-zero
- * probability down to "0%" nor a genuinely sub-certain one up to "100%":
- * either string is a claim (impossible, certain) the engine did not make.
- * A genuine 0 or 1 still renders "0%" / "100%", because those ARE honest.
+ * Two decimal places, unconditionally. A whole-percent figure collapses the
+ * Scenario Map's whole comparison: an implied 6.8% and a market 8.5% both
+ * round to "7%" and "9%", and a joint probability of 0.45% once rendered as
+ * "0%" outright. Two decimals keeps the comparison legible everywhere,
+ * including the extremes that used to need a special case.
  *
  * Scoped to the Scenario Map only (MapView, MapOutline, NodeList). pct()
  * itself is untouched: every other caller on the site - the board, the
@@ -31,11 +32,7 @@ export function pct(p: number | null, decimals = 1): string {
  */
 export function pctScenario(p: number | null): string {
   if (p == null) return pct(p);
-  const whole = Math.round(p * 100);
-  if ((p !== 0 && whole === 0) || (p !== 1 && whole === 100)) {
-    return `${(p * 100).toFixed(1)}%`;
-  }
-  return `${whole}%`;
+  return `${(p * 100).toFixed(2)}%`;
 }
 
 // Single-hue (blue) sequential ramp. Probability = magnitude, NOT sentiment.

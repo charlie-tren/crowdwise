@@ -47,7 +47,7 @@ describe("MapView", () => {
 
   it("prints the value on a resolved node and the reason on an unresolved one", () => {
     render(<MapView map={map} results={evaluateMap(map, [])} />);
-    expect(screen.getByText("30%")).toBeTruthy();
+    expect(screen.getByText("30.00%")).toBeTruthy();
     expect(screen.getByText(/No live market/i)).toBeTruthy();
   });
 

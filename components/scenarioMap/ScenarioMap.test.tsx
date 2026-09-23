@@ -45,7 +45,7 @@ describe("ScenarioMap", () => {
     // the figure, because jsdom applies no CSS, so MapView and MapOutline BOTH
     // render and every number appears more than once.
     expect(screen.getByDisplayValue("Recession in 2026")).toBeTruthy();
-    expect(screen.getAllByText("24%").length).toBeGreaterThan(0); // 0.3 * 0.8
+    expect(screen.getAllByText("24.00%").length).toBeGreaterThan(0); // 0.3 * 0.8
   });
 
   it("does not write the default to the URL", () => {
@@ -58,7 +58,7 @@ describe("ScenarioMap", () => {
     // An exact-string role name matches the CHIP only: the node row's accessible
     // name is the whole row, label plus kind plus figure.
     fireEvent.click(screen.getByRole("button", { name: "Soft landing" }));
-    expect(screen.getAllByText("56%").length).toBeGreaterThan(0); // 0.7 * 0.8
+    expect(screen.getAllByText("56.00%").length).toBeGreaterThan(0); // 0.7 * 0.8
   });
 
   it("loads a map from the URL hash as an unsaved copy", () => {

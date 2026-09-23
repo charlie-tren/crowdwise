@@ -25,7 +25,7 @@ describe("NodeList", () => {
   it("renders one row per node with its value", () => {
     render(<NodeList map={map} results={results()} markets={board} onChange={vi.fn()} />);
     expect(screen.getByText("My read")).toBeTruthy();
-    expect(screen.getByText("80%")).toBeTruthy();
+    expect(screen.getByText("80.00%")).toBeTruthy();
   });
 
   it("names the kind of each node", () => {

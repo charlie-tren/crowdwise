@@ -1,7 +1,17 @@
 import type { ScenarioMap } from "./types";
 
 // Box geometry in CSS pixels. Positions below are CENTRES.
-export const NODE_W = 168;
+//
+// 188, not 168: pctScenario now renders two decimal places unconditionally
+// (see lib/format.ts), so the value/range line got wider everywhere, and the
+// worst case is a near-certain node that still carries a visible range - eg.
+// value "100.00%" next to range "95.00% to 100.00%". Measured in a real SVG
+// text node at the old 168px, that pairing overlapped by roughly 5.6px (the
+// range's left edge landed inside the value's own text). 188px was the
+// narrowest round figure that puts a comfortable gap (about 14px) between
+// them for that same worst case, leaving normal, shorter figures with even
+// more room.
+export const NODE_W = 188;
 // 72, not 56: the label now wraps to two lines (see wrapLabel in MapView.tsx)
 // so a depends node's two conditional branches stay distinguishable instead
 // of both truncating to the same text. GAP_Y is left as is; at this NODE_H
