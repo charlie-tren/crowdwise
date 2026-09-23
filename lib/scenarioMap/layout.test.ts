@@ -94,3 +94,68 @@ describe("layoutMap", () => {
     expect(l.nodes.every((n) => Number.isFinite(n.x) && Number.isFinite(n.y))).toBe(true);
   });
 });
+
+// The scrapbook feature: a reader can drag a node anywhere, and the derived
+// (barycentre) layout stays the fallback for anything unplaced.
+describe("layoutMap with manual positions", () => {
+  it("lays out a node at its manual position instead of the derived one", () => {
+    const withPos: ScenarioMap = {
+      ...diamond,
+      nodes: diamond.nodes.map((n) => (n.id === "a" ? { ...n, position: { x: 500, y: 500 } } : n)),
+    };
+    const l = layoutMap(withPos, 900);
+    const a = l.nodes.find((n) => n.id === "a")!;
+    expect(a.x).toBeCloseTo(500, 5);
+    expect(a.y).toBeCloseTo(500, 5);
+  });
+
+  it("keeps a node without a position at its derived slot, unaffected by a sibling's manual position", () => {
+    const withPos: ScenarioMap = {
+      ...diamond,
+      nodes: diamond.nodes.map((n) => (n.id === "a" ? { ...n, position: { x: 500, y: 500 } } : n)),
+    };
+    const plain = layoutMap(diamond, 900);
+    const moved = layoutMap(withPos, 900);
+    const plainL = plain.nodes.find((n) => n.id === "l")!;
+    const movedL = moved.nodes.find((n) => n.id === "l")!;
+    expect(movedL.x).toBeCloseTo(plainL.x, 5);
+    expect(movedL.y).toBeCloseTo(plainL.y, 5);
+  });
+
+  it("routes an edge to a node's manual position, not its derived one", () => {
+    const withPos: ScenarioMap = {
+      ...diamond,
+      nodes: diamond.nodes.map((n) => (n.id === "top" ? { ...n, position: { x: 700, y: 401 } } : n)),
+    };
+    const l = layoutMap(withPos, 900);
+    const edge = l.edges.find((e) => e.from === "l" && e.to === "top")!;
+    expect(edge).toBeTruthy();
+    // The bezier's destination end must land on the node's moved centre y.
+    expect(edge.path.trim().endsWith("401")).toBe(true);
+  });
+
+  it("grows the canvas to contain a node dragged past the derived bounds", () => {
+    const withPos: ScenarioMap = {
+      ...diamond,
+      nodes: diamond.nodes.map((n) => (n.id === "a" ? { ...n, position: { x: 3000, y: 3000 } } : n)),
+    };
+    const derived = layoutMap(diamond, 900);
+    const moved = layoutMap(withPos, 900);
+    expect(moved.width).toBeGreaterThan(derived.width);
+    expect(moved.height).toBeGreaterThan(derived.height);
+    const a = moved.nodes.find((n) => n.id === "a")!;
+    expect(a.x + NODE_W / 2).toBeLessThanOrEqual(moved.width);
+    expect(a.y + NODE_H / 2).toBeLessThanOrEqual(moved.height);
+  });
+
+  it("clamps a manual position so a node cannot be dragged above or left of the canvas origin", () => {
+    const withPos: ScenarioMap = {
+      ...diamond,
+      nodes: diamond.nodes.map((n) => (n.id === "a" ? { ...n, position: { x: -500, y: -500 } } : n)),
+    };
+    const l = layoutMap(withPos, 900);
+    const a = l.nodes.find((n) => n.id === "a")!;
+    expect(a.x - NODE_W / 2).toBeGreaterThanOrEqual(0);
+    expect(a.y - NODE_H / 2).toBeGreaterThanOrEqual(0);
+  });
+});

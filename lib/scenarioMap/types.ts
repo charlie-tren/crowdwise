@@ -5,6 +5,18 @@
 
 export type Operator = "and" | "or" | "not" | "mix" | "depends";
 
+// A reader's own placement on the map, in the same container-pixel, centre-of-box
+// space layoutMap already draws in. Optional, and absent is the ordinary state:
+// layoutMap falls back to the derived (barycentre) layout for any node without
+// one, so a fresh map, a built-in and a shared link all still open arranged
+// rather than piled at the origin. Present on every node kind - position is
+// cosmetic, orthogonal to what a node computes, so it is not restricted to one
+// kind the way `override` (market-only) or `low`/`likely`/`high` (input-only) are.
+export interface NodePosition {
+  x: number;
+  y: number;
+}
+
 export interface MarketNode {
   id: string;
   kind: "market";
@@ -18,6 +30,7 @@ export interface MarketNode {
   // node's own live price is never altered or hidden by setting this - see
   // NodeResult.livePrice, which always carries it separately for display.
   override?: number;
+  position?: NodePosition;
 }
 
 export interface InputNode {
@@ -28,6 +41,7 @@ export interface InputNode {
   likely: number;        // 0..1
   high: number;          // 0..1
   source: string;        // "Charlie", "3 of 12 post-war cycles", a URL
+  position?: NodePosition;
 }
 
 export interface FormulaNode {
@@ -39,6 +53,7 @@ export interface FormulaNode {
   // For "not" there is exactly one ref.
   refs: string[];
   weights?: number[];    // "mix" only, same length as refs
+  position?: NodePosition;
 }
 
 export type MapNode = MarketNode | InputNode | FormulaNode;

@@ -126,4 +126,14 @@ describe("MapOutline", () => {
     // not duplicated anywhere else in the tree.
     expect(screen.getByText("Both")).toBeTruthy();
   });
+
+  it("renders identically whether or not a node carries a manual position, since positions are meaningless here", () => {
+    const positioned: ScenarioMap = {
+      ...map,
+      nodes: map.nodes.map((n) => (n.id === "a" ? { ...n, position: { x: 999, y: 999 } } : n)),
+    };
+    const { container: plain } = render(<MapOutline map={map} results={evaluateMap(map, [])} />);
+    const { container: withPos } = render(<MapOutline map={positioned} results={evaluateMap(positioned, [])} />);
+    expect(withPos.innerHTML).toBe(plain.innerHTML);
+  });
 });

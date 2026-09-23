@@ -7,6 +7,7 @@ import type { MapNode, ScenarioMap as MapType } from "@/lib/scenarioMap/types";
 import type { Market } from "@/lib/types";
 import { MapOutline } from "./MapOutline";
 import { MapView } from "./MapView";
+import { MarketPicker } from "./MarketPicker";
 import { NodeList } from "./NodeList";
 
 const FOCUS_RING = "focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
@@ -18,6 +19,7 @@ export function ScenarioMap({ markets }: { markets: Market[] }) {
   const [current, setCurrent] = useState<MapType>(builtIns[0]);
   const [dirty, setDirty] = useState(false);
   const [shared, setShared] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Storage is read AFTER mount, never during render: the server has none, and
   // reading it in render would make the two disagree. This effect never touches
@@ -99,6 +101,14 @@ export function ScenarioMap({ markets }: { markets: Market[] }) {
 
   const addNode = (node: MapNode) => edit({ ...current, nodes: [...current.nodes, node] });
 
+  // Clears every node's manual position, returning the whole map to the
+  // derived (barycentre) layout. Itself an edit, same as a drag: it marks the
+  // map dirty, so resetting a built-in's layout forks it exactly as moving a
+  // node in the first place would have.
+  const resetLayout = () =>
+    edit({ ...current, nodes: current.nodes.map((n) => ({ ...n, position: undefined })) });
+  const hasManualPositions = current.nodes.some((n) => n.position != null);
+
   const onSave = () => {
     // A built-in is never overwritten: saving an edited one forks it.
     const target: MapType =
@@ -172,10 +182,8 @@ export function ScenarioMap({ markets }: { markets: Market[] }) {
           Add estimate
         </button>
         <button
-          onClick={() => {
-            const top = markets.find((m) => m.prob != null);
-            addNode({ id: newId(), kind: "market", label: top?.title.slice(0, 40) ?? "Pick a market", marketId: top?.id ?? "", side: "yes" });
-          }}
+          onClick={() => setPickerOpen((open) => !open)}
+          aria-expanded={pickerOpen}
           className={`rounded-lg border border-white/10 px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-[var(--text)] ${FOCUS_RING}`}
         >
           Add market
@@ -189,6 +197,11 @@ export function ScenarioMap({ markets }: { markets: Market[] }) {
           Add formula
         </button>
         <span className="ml-auto flex gap-2">
+          {hasManualPositions && (
+            <button onClick={resetLayout} className={`rounded-lg border border-white/10 px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-[var(--text)] ${FOCUS_RING}`}>
+              Reset layout
+            </button>
+          )}
           <button onClick={onShare} className={`rounded-lg border border-white/10 px-3 py-1.5 text-[12px] text-muted transition-colors hover:text-[var(--text)] ${FOCUS_RING}`}>
             Share
           </button>
@@ -205,6 +218,22 @@ export function ScenarioMap({ markets }: { markets: Market[] }) {
           )}
         </span>
       </div>
+
+      {pickerOpen && (
+        <MarketPicker
+          markets={markets}
+          onPick={(market) => {
+            // The full title, not truncated here: the node box (MapView) and
+            // the node-list row both already clip to fit with their own CSS
+            // truncation, so cutting it again at add time would just lose
+            // words for good from the detail view and every aria-label that
+            // reads the label back.
+            addNode({ id: newId(), kind: "market", label: market.title, marketId: market.id, side: "yes" });
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
 
       <NodeList map={current} results={results} markets={markets} onChange={edit} />
     </div>

@@ -24,6 +24,14 @@ const board: Market[] = [
   mk("cut", "Fed cut rates before 2027", "Rates/Fed", 0.8),
 ];
 
+// A wider board for the market-picker tests: distinct titles and themes so
+// search and theme filtering have something real to narrow.
+const pickerBoard: Market[] = [
+  ...board,
+  mk("oil", "Will oil top $100 a barrel in 2026?", "Commodities/Oil", 0.15),
+  mk("unemp", "Will US unemployment exceed 5% in 2026?", "Growth/Recession", 0.22),
+];
+
 // Sets the hash the way a same-document navigation would, then fires the
 // event by hand rather than trusting jsdom to raise it off the assignment:
 // this way the test proves the LISTENER works, not jsdom's location plumbing.
@@ -220,6 +228,111 @@ describe("ScenarioMap", () => {
     expect(draggedNode).toBeTruthy();
 
     rectSpy.mockRestore();
+  });
+
+  it("dragging a node body marks the map dirty, so Save forks the built-in", () => {
+    const { container } = render(<ScenarioMap markets={board} />);
+    const rect = container.querySelectorAll("[data-node] rect")[0]!;
+    fireEvent.pointerDown(rect, { clientX: 50, clientY: 50, pointerId: 1 });
+    fireEvent.pointerMove(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    const saved = loadSaved();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].builtIn).toBeUndefined();
+    expect(saved[0].id).not.toBe("recession");
+    expect(saved[0].nodes.some((n) => n.position != null)).toBe(true);
+  });
+
+  it("shows a layout-reset control only once a node has been moved, and it clears every manual position", () => {
+    const { container } = render(<ScenarioMap markets={board} />);
+    expect(screen.queryByRole("button", { name: /reset layout/i })).toBeNull();
+
+    const rect = container.querySelectorAll("[data-node] rect")[0]!;
+    fireEvent.pointerDown(rect, { clientX: 50, clientY: 50, pointerId: 1 });
+    fireEvent.pointerMove(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+
+    const resetBtn = screen.getByRole("button", { name: /reset layout/i });
+    fireEvent.click(resetBtn);
+    expect(screen.queryByRole("button", { name: /reset layout/i })).toBeNull();
+  });
+
+  describe("Add market picker", () => {
+    it("lists markets without a search being typed", () => {
+      render(<ScenarioMap markets={pickerBoard} />);
+      fireEvent.click(screen.getByRole("button", { name: /^add market$/i }));
+      expect(screen.getByRole("button", { name: /oil top \$100/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /unemployment exceed 5%/i })).toBeTruthy();
+    });
+
+    it("typing filters the list", () => {
+      render(<ScenarioMap markets={pickerBoard} />);
+      fireEvent.click(screen.getByRole("button", { name: /^add market$/i }));
+      fireEvent.change(screen.getByPlaceholderText(/search markets/i), { target: { value: "oil" } });
+      expect(screen.getByRole("button", { name: /oil top \$100/i })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /unemployment exceed 5%/i })).toBeNull();
+    });
+
+    it("a theme filter narrows the list", () => {
+      render(<ScenarioMap markets={pickerBoard} />);
+      fireEvent.click(screen.getByRole("button", { name: /^add market$/i }));
+      // All themes start active; clicking one OFF hides just that theme's markets.
+      fireEvent.click(screen.getByRole("button", { name: "Commodities/Oil" }));
+      expect(screen.queryByRole("button", { name: /oil top \$100/i })).toBeNull();
+      expect(screen.getByRole("button", { name: /unemployment exceed 5%/i })).toBeTruthy();
+    });
+
+    it("choosing a market closes the picker", () => {
+      render(<ScenarioMap markets={pickerBoard} />);
+      fireEvent.click(screen.getByRole("button", { name: /^add market$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /oil top \$100/i }));
+      expect(screen.queryByPlaceholderText(/search markets/i)).toBeNull();
+    });
+
+    it("choosing a market adds a node carrying THAT market's id, not the first market on the board", () => {
+      render(<ScenarioMap markets={pickerBoard} />);
+      fireEvent.click(screen.getByRole("button", { name: /^add market$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /oil top \$100/i }));
+
+      fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+      const saved = loadSaved();
+      const oilNode = saved[0].nodes.find((n) => n.kind === "market" && n.marketId === "oil");
+      expect(oilNode).toBeTruthy();
+      // Not the old always-picks-the-first-market-with-a-price behaviour: the
+      // node this click ADDED (the last one, appended by addNode) is the oil
+      // market, not "rec" (the first market on pickerBoard with a price).
+      const added = saved[0].nodes[saved[0].nodes.length - 1];
+      expect(added.kind === "market" && added.marketId).toBe("oil");
+    });
+
+    it("adding a market marks the map dirty, so Save forks the built-in", () => {
+      render(<ScenarioMap markets={pickerBoard} />);
+      fireEvent.click(screen.getByRole("button", { name: /^add market$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /oil top \$100/i }));
+
+      fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+      const saved = loadSaved();
+      expect(saved).toHaveLength(1);
+      expect(saved[0].builtIn).toBeUndefined();
+      expect(saved[0].id).not.toBe("recession");
+    });
+
+    it("two different choices add two different markets", () => {
+      render(<ScenarioMap markets={pickerBoard} />);
+      fireEvent.click(screen.getByRole("button", { name: /^add market$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /oil top \$100/i }));
+
+      fireEvent.click(screen.getByRole("button", { name: /^add market$/i }));
+      fireEvent.click(screen.getByRole("button", { name: /unemployment exceed 5%/i }));
+
+      fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+      const saved = loadSaved();
+      const marketIds = saved[0].nodes.filter((n) => n.kind === "market").map((n) => (n as { marketId: string }).marketId);
+      expect(marketIds).toContain("oil");
+      expect(marketIds).toContain("unemp");
+    });
   });
 
   it("removes the hashchange listener on unmount", () => {

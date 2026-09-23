@@ -26,7 +26,10 @@ export const NODE_W = 188;
 export const NODE_H = 88;
 const GAP_X = 56;
 const GAP_Y = 22;
-const PAD = 8;
+// Exported: MapView clamps a node being dragged live to the same margin this
+// module clamps a stored position to, so the two never disagree about where
+// the boundary is (see the module comment on manual positions below).
+export const PAD = 8;
 
 export interface LayoutNode { id: string; x: number; y: number; layer: number }
 export interface LayoutEdge { from: string; to: string; path: string }
@@ -88,29 +91,77 @@ export function layoutMap(map: ScenarioMap, width: number): MapLayout {
   }
 
   const tallest = Math.max(1, ...columns.map((col) => col.length));
-  const height = PAD * 2 + tallest * NODE_H + (tallest - 1) * GAP_Y;
-  const canvasW = Math.max(width, PAD * 2 + columns.length * NODE_W + (columns.length - 1) * GAP_X);
+  const derivedHeight = PAD * 2 + tallest * NODE_H + (tallest - 1) * GAP_Y;
+  const derivedWidth = Math.max(width, PAD * 2 + columns.length * NODE_W + (columns.length - 1) * GAP_X);
 
+  // The derived (barycentre) slot for every node - the fallback used whenever
+  // a node carries no manual position of its own, and the target the "Reset
+  // layout" control in ScenarioMap.tsx returns a moved node to.
+  const derived = new Map<string, { x: number; y: number }>();
+  columns.forEach((col, c) => {
+    const colHeight = col.length * NODE_H + (col.length - 1) * GAP_Y;
+    const top = (derivedHeight - colHeight) / 2;
+    col.forEach((id, i) => {
+      derived.set(id, {
+        x: PAD + NODE_W / 2 + c * (NODE_W + GAP_X),
+        y: top + NODE_H / 2 + i * (NODE_H + GAP_Y),
+      });
+    });
+  });
+
+  // A reader's own placement, when they have set one, otherwise the derived
+  // slot above. Clamped so a node dragged above or left of the origin cannot
+  // put itself (or drag the canvas) into negative space - the box's own top-left
+  // corner is never allowed past the same PAD margin the derived layout already
+  // keeps everything inside of. This is a clamp, not a shift of the whole
+  // coordinate space: the alternative (sliding every OTHER node to make room)
+  // would move nodes the reader never touched, which is worse than the one
+  // they dragged simply stopping at the edge.
+  const finalPos = new Map<string, { x: number; y: number }>();
+  for (const n of map.nodes) {
+    const manual = n.position;
+    const base = manual ?? derived.get(n.id);
+    if (!base) continue;
+    finalPos.set(n.id, {
+      x: Math.max(PAD + NODE_W / 2, base.x),
+      y: Math.max(PAD + NODE_H / 2, base.y),
+    });
+  }
+
+  // Built in the same column-major, barycentre-ordered walk as before (not
+  // map.nodes order): the "deterministic and independent of node order" test
+  // depends on this array's order coming from the graph's structure, not from
+  // whatever order the caller happened to supply nodes in.
   const nodes: LayoutNode[] = [];
   const pos = new Map<string, LayoutNode>();
   columns.forEach((col, c) => {
-    const colHeight = col.length * NODE_H + (col.length - 1) * GAP_Y;
-    const top = (height - colHeight) / 2;
-    col.forEach((id, i) => {
-      const node: LayoutNode = {
-        id,
-        x: PAD + NODE_W / 2 + c * (NODE_W + GAP_X),
-        y: top + NODE_H / 2 + i * (NODE_H + GAP_Y),
-        layer: c,
-      };
+    col.forEach((id) => {
+      const p = finalPos.get(id)!;
+      const node: LayoutNode = { id, x: p.x, y: p.y, layer: c };
       nodes.push(node);
       pos.set(id, node);
     });
   });
 
+  // The canvas must contain every node wherever it was put, not just the
+  // derived grid: it grows to the right and down for a node dragged past the
+  // original bounds, and never shrinks below the derived minimum (which also
+  // keeps the sideways-scrolling container filling its own width when the map
+  // is small). Height has no equivalent "fill the container" floor - see the
+  // note on MapView's container, which scrolls sideways but simply grows the
+  // page vertically rather than opening its own vertical scrollbar.
+  let canvasW = derivedWidth;
+  let canvasH = derivedHeight;
+  for (const p of finalPos.values()) {
+    canvasW = Math.max(canvasW, p.x + NODE_W / 2 + PAD);
+    canvasH = Math.max(canvasH, p.y + NODE_H / 2 + PAD);
+  }
+
   // Walk `nodes` (already laid out in deterministic, id/barycentre order), not
   // `map.nodes`: the same graph supplied in a different node order must yield
-  // the same edge array, not just the same edge set.
+  // the same edge array, not just the same edge set. Endpoints come from
+  // `pos`, which carries each node's FINAL (manual-or-derived) position, so
+  // an edge follows its nodes wherever they were dragged.
   const edges: LayoutEdge[] = [];
   for (const ln of nodes) {
     for (const ref of refsOf(ln.id)) {
@@ -125,5 +176,5 @@ export function layoutMap(map: ScenarioMap, width: number): MapLayout {
     }
   }
 
-  return { nodes, edges, width: canvasW, height };
+  return { nodes, edges, width: canvasW, height: canvasH };
 }

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { pctScenario } from "@/lib/format";
-import { layoutMap, NODE_H, NODE_W } from "@/lib/scenarioMap/layout";
+import { layoutMap, NODE_H, NODE_W, PAD } from "@/lib/scenarioMap/layout";
+import type { LayoutNode } from "@/lib/scenarioMap/layout";
 import type { InputNode, MapNode, MarketNode, NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
 import { THEME_COLOURS } from "@/lib/themeColours";
 import type { Market } from "@/lib/types";
@@ -99,6 +100,116 @@ export function MapView({
   const box = useRef<HTMLDivElement>(null);
   const [measured, setMeasured] = useState(0);
 
+  // Paint order for the nodes: normally the layout's own column order, but a
+  // node the reader has grabbed is drawn LAST from then on, so it settles on
+  // top of whatever it was dropped onto instead of staying buried behind it.
+  // This is `frontOrder`, a list of ids oldest-brought-forward first - only
+  // ids that have been touched appear in it at all, and the last id in it
+  // paints last (on top). It is deliberately NOT part of `map`: the node
+  // order the map's own array carries is what the node list, the outline and
+  // the share payload all read, and disturbing it just to change paint order
+  // would leak a purely cosmetic concern into all three. It also does not
+  // need to survive a save or a share link - the next time this exact map is
+  // opened (by this reader after a reload, or by whoever a link is shared
+  // with) nothing has been dragged in THAT session yet, so there is nothing
+  // to bring forward and the plain layout order is already correct.
+  const [frontOrder, setFrontOrder] = useState<string[]>([]);
+
+  // A different map replacing this one (a chip click, "New map", a shared
+  // link landing) makes any remembered stacking meaningless - it names ids
+  // that may not even exist on the new map, or that collide by coincidence
+  // with different nodes. Reset it the moment the map identity changes, using
+  // the ordinary "adjust state while rendering" pattern rather than an
+  // effect: the render that sees a new id bails out immediately into a
+  // second render with the reset state already applied, with no extra frame
+  // and nothing for react-hooks/set-state-in-effect to flag.
+  const [frontOrderMapId, setFrontOrderMapId] = useState(map.id);
+  if (frontOrderMapId !== map.id) {
+    setFrontOrderMapId(map.id);
+    setFrontOrder([]);
+  }
+
+  const bringToFront = (id: string) =>
+    setFrontOrder((order) => (order.at(-1) === id ? order : [...order.filter((x) => x !== id), id]));
+
+  // Dragging a node's BODY moves it; dragging its value track (EstimateTrack,
+  // rendered as a sibling further down this same node group) changes its
+  // number. The two gestures are kept apart structurally, not by
+  // stopPropagation: these pointer handlers are attached only to the node's
+  // background <rect>, never to the wrapping <g> the track also lives in, so
+  // a pointerdown that lands on the track's hit circle is never even seen
+  // here - there is no shared ancestor for it to bubble through into. One
+  // node drags at a time, so a single ref (not one per node) is enough,
+  // mirroring EstimateTrack's own drag-state shape: a start snapshot, a
+  // throttling animation frame, and the not-yet-committed position it owes
+  // onChange.
+  const nodeDrag = useRef<{ id: string; startClientX: number; startClientY: number; startX: number; startY: number } | null>(null);
+  const nodeDragFrame = useRef<number | null>(null);
+  const pendingNodeDrag = useRef<{ id: string; x: number; y: number } | null>(null);
+
+  const clearNodeDragFrame = () => {
+    if (nodeDragFrame.current != null) {
+      cancelAnimationFrame(nodeDragFrame.current);
+      nodeDragFrame.current = null;
+    }
+  };
+  useEffect(() => () => {
+    clearNodeDragFrame();
+    pendingNodeDrag.current = null;
+  }, []);
+
+  const commitNodeDrag = (p: { id: string; x: number; y: number }) => {
+    if (!onChange) return;
+    onChange({
+      ...map,
+      nodes: map.nodes.map((n) => (n.id === p.id ? ({ ...n, position: { x: p.x, y: p.y } } as MapNode) : n)),
+    });
+  };
+
+  // Clamped to the exact same PAD/NODE_W/NODE_H margin layoutMap itself
+  // clamps a stored position to (see PAD's export there), so what the reader
+  // sees settle under their pointer during the drag is never a different
+  // place than where the next render's layoutMap will put it.
+  const clampToCanvas = (x: number, y: number) => ({
+    x: Math.max(PAD + NODE_W / 2, x),
+    y: Math.max(PAD + NODE_H / 2, y),
+  });
+
+  const onNodePointerDown = (e: React.PointerEvent<SVGRectElement>, id: string, startX: number, startY: number) => {
+    if (!onChange) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    nodeDrag.current = { id, startClientX: e.clientX, startClientY: e.clientY, startX, startY };
+    // The node comes to the front the moment it is grabbed, not only once the
+    // pointer has actually moved: the reader has already started touching it,
+    // and a click-without-drag bumping it forward is harmless.
+    bringToFront(id);
+  };
+
+  const onNodePointerMove = (e: React.PointerEvent<SVGRectElement>) => {
+    const s = nodeDrag.current;
+    if (!s) return;
+    const { x, y } = clampToCanvas(s.startX + (e.clientX - s.startClientX), s.startY + (e.clientY - s.startClientY));
+    clearNodeDragFrame();
+    pendingNodeDrag.current = { id: s.id, x, y };
+    nodeDragFrame.current = requestAnimationFrame(() => {
+      nodeDragFrame.current = null;
+      const toCommit = pendingNodeDrag.current;
+      pendingNodeDrag.current = null;
+      if (toCommit) commitNodeDrag(toCommit);
+    });
+  };
+
+  const endNodeDrag = () => {
+    nodeDrag.current = null;
+    // Same fast-drag fix as EstimateTrack's endDrag: flush whatever the last
+    // scheduled frame was about to commit right now, synchronously, rather
+    // than losing it to a frame that never got a chance to fire before release.
+    clearNodeDragFrame();
+    const toCommit = pendingNodeDrag.current;
+    pendingNodeDrag.current = null;
+    if (toCommit) commitNodeDrag(toCommit);
+  };
+
   useEffect(() => {
     if (fixedWidth != null || !box.current) return;
     const el = box.current;
@@ -125,6 +236,25 @@ export function MapView({
 
   const width = fixedWidth ?? measured;
   const layout = width > 0 ? layoutMap(map, width) : null;
+
+  // The nodes never touched by frontOrder keep the layout's own order; the
+  // touched ones are appended in the order they were brought forward, so the
+  // most recently grabbed one is always last - and so always on top. Filtered
+  // through `layout.nodes` rather than iterating `frontOrder` alone, so a
+  // stale id (a node deleted after being dragged) just drops out instead of
+  // rendering nothing.
+  const paintOrder: LayoutNode[] = layout
+    ? frontOrder.length === 0
+      ? layout.nodes
+      : (() => {
+          const front = new Set(frontOrder);
+          const byNodeId = new Map(layout.nodes.map((ln) => [ln.id, ln]));
+          const untouched = layout.nodes.filter((ln) => !front.has(ln.id));
+          const brought = frontOrder.map((id) => byNodeId.get(id)).filter((ln): ln is LayoutNode => ln != null);
+          return [...untouched, ...brought];
+        })()
+    : [];
+
   const byId = new Map(map.nodes.map((n) => [n.id, n]));
   const categoryById = new Map(markets.map((m) => [m.id, m.category]));
 
@@ -217,7 +347,7 @@ export function MapView({
               />
             ))}
           </g>
-          {layout.nodes.map((ln) => {
+          {paintOrder.map((ln) => {
             const node = byId.get(ln.id)!;
             const r = results.get(ln.id);
             const colour = colourFor(node);
@@ -225,12 +355,17 @@ export function MapView({
             const hasRange = ok && r.p10 != null && r.p90 != null && r.p90 - r.p10 > 0.005;
             const labelLines = wrapLabel(node.label);
             return (
-              <g key={ln.id} data-node transform={`translate(${ln.x - NODE_W / 2}, ${ln.y - NODE_H / 2})`}>
+              <g key={ln.id} data-node data-node-id={ln.id} transform={`translate(${ln.x - NODE_W / 2}, ${ln.y - NODE_H / 2})`}>
                 <rect
                   width={NODE_W} height={NODE_H} rx={10}
                   fill="rgba(255,255,255,0.03)"
                   stroke={ok ? colour : "rgba(255,255,255,0.10)"}
                   strokeWidth={1}
+                  style={onChange ? { cursor: "grab", touchAction: "none" } : undefined}
+                  onPointerDown={onChange ? (e) => onNodePointerDown(e, ln.id, ln.x, ln.y) : undefined}
+                  onPointerMove={onChange ? onNodePointerMove : undefined}
+                  onPointerUp={onChange ? endNodeDrag : undefined}
+                  onPointerCancel={onChange ? endNodeDrag : undefined}
                 />
                 {labelLines.length > 0 && (
                   <text x={10} y={16} fontSize={11.5} fill="var(--text)">
