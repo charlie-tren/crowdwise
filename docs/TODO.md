@@ -163,7 +163,17 @@ remains the right bet; the work above is hygiene, not a strategy.
   `boardStore` has data. Verified on prod: deep-in-the-list markets 200, bogus ids still 404.
 - Non-Fed verbose titles (WTI oil strikes, jobs, GDP, geopolitics) left deliberately - no
   clean universal transform; only Fed titles are canonicalised (`displayTitle`). WON'T-DO.
-- **Compare misses the biggest cross-venue pair on the board, and adding it needs a
+- **SHIPPED 23/09/2026 (PR #3). Compare now pairs a proposition with its inverse.**
+  Kept for the reasoning, which still governs any new proposition family.
+  The pair that was missing is live: Kalshi "cut rates before 2027" at 5.4% against
+  Polymarket "no Fed rate cuts happen in 2026" NO side at 3.5%, labelled `NO side`.
+  Polarity is tracked per MARKET and deliberately kept OUT of the key, or a YES could
+  never meet a NO. There is no generic token negation: two exact phrasings only, because
+  negation detection is token-shaped and tokens are what this module exists not to match
+  on. Four traps have fixture tests: "no change" is a Hold and must not be stolen,
+  exactly-one is not at-least-one, "before YYYY" means the year before, and six other
+  central banks share the shape without sharing the key. Original note follows.
+- **(closed) Compare missed the biggest cross-venue pair, and it needed a
   POLARITY decision first.** Audited 23/09/2026 by enumerating every pair `findCrossVenue`
   produces against a live 696-market pull. All 6 pairs it makes are genuinely the same
   proposition, so the matcher is sound and there are no false pairs. The gap is coverage:
@@ -203,6 +213,30 @@ remains the right bet; the work above is hygiene, not a strategy.
     in `StrikeLadders` and the Fed charts, so a healthy node may read as a caution.
   - On a phone the outline and the node list state the same figures twice. Desktop does
     the same thing (picture, then list), so it was left rather than redesigned unasked.
+- Scenario Map became an arrangeable board, 23/09 to 24/09/2026 (PRs #7 to #10):
+  - Estimate AND market nodes carry a draggable track. A market drag sets a what-if
+    OVERRIDE and the venue's own price stays beside it as `live 8.50%`; clicking that
+    clears it. The earlier rule that market nodes must not be draggable was wrong: it was
+    right about ASSERTING a price and wrong about EXPLORING one, and it left all four
+    built-in maps with ZERO draggable nodes, so the feature was invisible on every map the
+    page opens on. A test now asserts every built-in has more than zero.
+  - Nodes drag anywhere in 2D. Positions save, travel in a share link, and fall back to
+    the derived layout, so a new or shared map still opens arranged. "Reset layout"
+    appears once anything has moved. Arrows stay derived from the formulas.
+  - The grabbed node paints last, so free positioning cannot bury a node under one placed
+    earlier. Deliberately NOT stored on the node: a cosmetic paint order does not belong
+    in the array that also drives the list, the outline and the share payload.
+  - "Add market" opens a picker. It used to add the same market every time, the first on
+    the board with a price, out of about 700.
+  - Two gestures on one node are separated STRUCTURALLY: the value track is a sibling
+    group, so a pointer starting on it can never reach the node-body handler.
+  - `evaluateMap` reports an input node's percentiles from the closed-form triangular
+    inverse CDF rather than from its own samples. It was returning 35.09% for a value the
+    reader set to exactly 35%, which is the estimator's error handed back as their number.
+    What a node REPORTS is now separate from what it FEEDS; formulas still use Monte Carlo.
+  - Engine sorts each node's samples once rather than three times, 30.6ms to 13.3ms on a
+    12-node map. The draw count stays at 4,000 on purpose: fewer draws would make a figure
+    wobble during a drag and change again on release.
 - Model-drafted maps: NOT built, and the obvious provider does not work. `CF_ACCOUNT_ID`
   and `CF_API_TOKEN` are GitHub Actions secrets in `the-aftertimes` and `dystopianist`,
   which a Vercel app cannot read, and that account's 10,000 neurons a day are already
