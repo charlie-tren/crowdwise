@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { NodeList } from "./NodeList";
 import { evaluateMap } from "@/lib/scenarioMap/engine";
 import type { ScenarioMap } from "@/lib/scenarioMap/types";
@@ -116,5 +116,88 @@ describe("NodeList", () => {
     };
     render(<NodeList map={near} results={evaluateMap(near, [])} markets={board} onChange={vi.fn()} />);
     expect(screen.queryByText("100%")).toBeNull();
+  });
+});
+
+// The drag track. jsdom has no layout, so the track's reference rect is
+// stubbed to a known screen geometry rather than fought for real - see the
+// same comment in EstimateTrack.test.tsx.
+function stubTrackRect(width = 200, left = 0) {
+  return vi
+    .spyOn(SVGElement.prototype, "getBoundingClientRect")
+    .mockReturnValue({ left, width, top: 0, height: 16, right: left + width, bottom: 16, x: left, y: 0, toJSON() {} });
+}
+
+describe("NodeList drag track", () => {
+  it("gives an input node a slider track, always visible, not gated behind opening the row", () => {
+    const { container } = render(<NodeList map={map} results={results()} markets={board} onChange={vi.fn()} />);
+    // The row is not opened - no click on it - so this proves the track is
+    // reachable without expanding the editor.
+    expect(container.querySelectorAll("[data-estimate-track]")).toHaveLength(1);
+    expect(screen.getAllByRole("slider")).toHaveLength(1);
+  });
+
+  it("gives no track to a market node or a formula node", () => {
+    const { container } = render(<NodeList map={map} results={results()} markets={board} onChange={vi.fn()} />);
+    // map has one input ("i"), one market ("k"), one formula ("f"); exactly
+    // one track total proves the other two kinds get none.
+    expect(container.querySelectorAll("[data-estimate-track]")).toHaveLength(1);
+  });
+
+  it("dragging the track calls onChange with a shifted, width-preserving range - the same path typing uses", async () => {
+    const rectSpy = stubTrackRect(200, 0);
+    const onChange = vi.fn();
+    render(<NodeList map={map} results={results()} markets={board} onChange={onChange} />);
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { clientX: 160, pointerId: 1 }); // fraction 0.8
+    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+
+    expect(onChange).toHaveBeenCalled();
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const edited = next.nodes.find((n) => n.id === "i")!;
+    expect(edited.kind === "input" && edited.likely).toBeCloseTo(0.8, 1);
+    expect(edited.kind === "input" && edited.high - edited.low).toBeCloseTo(0.5 - 0.2); // width preserved
+    rectSpy.mockRestore();
+  });
+
+  it("a drag on the track changes a downstream formula's value", async () => {
+    const rectSpy = stubTrackRect(200, 0);
+    const onChange = vi.fn();
+    render(<NodeList map={map} results={results()} markets={board} onChange={onChange} />);
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { clientX: 10, pointerId: 1 }); // fraction ~0.05, near the low end
+    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const before = results().get("f")!;
+    const after = evaluateMap(next, board).get("f")!;
+    expect(after.status).toBe("ok");
+    expect(before.status).toBe("ok");
+    expect(after.p50).not.toBeCloseTo(before.p50 as number, 3);
+    rectSpy.mockRestore();
+  });
+
+  it("does not mutate the map object it was handed", async () => {
+    const rectSpy = stubTrackRect(200, 0);
+    const onChange = vi.fn();
+    const original = JSON.parse(JSON.stringify(map));
+    render(<NodeList map={map} results={results()} markets={board} onChange={onChange} />);
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { clientX: 180, pointerId: 1 });
+    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+
+    expect(map).toEqual(original);
+    rectSpy.mockRestore();
+  });
+
+
+  it("arrow keys move the value and Home/End reach the ends of what the band's width allows", () => {
+    const onChange = vi.fn();
+    render(<NodeList map={map} results={results()} markets={board} onChange={onChange} />);
+    const handle = screen.getByRole("slider");
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const edited = next.nodes.find((n) => n.id === "i")!;
+    expect(edited.kind === "input" && edited.likely).toBeCloseTo(0.31);
   });
 });

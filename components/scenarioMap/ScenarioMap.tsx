@@ -160,7 +160,7 @@ export function ScenarioMap({ markets }: { markets: Market[] }) {
       />
 
       <div className="mb-6 rounded-2xl border border-white/[0.06] bg-panel/40 p-4">
-        <MapView map={current} results={results} markets={markets} />
+        <MapView map={current} results={results} markets={markets} onChange={edit} />
         <MapOutline map={current} results={results} />
       </div>
 

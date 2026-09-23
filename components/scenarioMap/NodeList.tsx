@@ -3,6 +3,7 @@ import { useState } from "react";
 import { pctScenario } from "@/lib/format";
 import type { MapNode, NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
 import type { Market } from "@/lib/types";
+import { EstimateTrack, TRACK_H, TRACK_UNITS } from "./EstimateTrack";
 
 const FOCUS_RING = "focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const FIELD = `w-20 rounded-md border border-white/10 bg-panel/40 px-2 py-1 text-[13px] tabular-nums outline-none ${FOCUS_RING}`;
@@ -94,6 +95,39 @@ export function NodeList({
                 <span className="shrink-0 text-[11px] text-[var(--muted-dim)]">{r?.reason ?? "Unresolved"}</span>
               )}
             </button>
+
+            {/* Reachable without opening the row - a phone is where dragging is
+                most natural, and a control only reachable after a tap plus a
+                drag is not reachable at all in practice. Only an input node
+                gets one; see MapView's updateEstimate comment for why a market
+                or formula node never does. Sibling to the button, not nested in
+                it, so the track's own focus/click never toggles the row open. */}
+            {node.kind === "input" && (
+              <div className="px-4 pb-3">
+                {/* overflow: visible - without it this SVG clips to its own
+                    16px-tall viewport (the browser default for svg is
+                    overflow: hidden), which would silently cut the drag
+                    handle's enlarged touch target (see HIT_R in
+                    EstimateTrack.tsx) down to ~16px tall here, right where a
+                    real thumb needs the full target most: this row is the
+                    only place the control appears on a phone. Nothing else
+                    in the track draws outside the nominal 16px box, so this
+                    has no other visual effect. */}
+                <svg
+                  width="100%"
+                  height={TRACK_H}
+                  viewBox={`0 0 ${TRACK_UNITS} ${TRACK_H}`}
+                  preserveAspectRatio="none"
+                  style={{ overflow: "visible" }}
+                >
+                  <EstimateTrack
+                    node={node}
+                    onChange={(range) => replace(node.id, range as Partial<MapNode>)}
+                    ariaLabel={`${node.label || "Estimate"} likelihood`}
+                  />
+                </svg>
+              </div>
+            )}
 
             {open && (
               <div className="flex flex-col gap-3 border-t border-white/[0.06] px-4 py-3">

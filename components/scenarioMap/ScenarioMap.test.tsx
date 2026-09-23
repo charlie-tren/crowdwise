@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, beforeAll, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { ScenarioMap } from "./ScenarioMap";
 import { encodeMap, loadSaved, STORAGE_KEY } from "@/lib/scenarioMap/codec";
 import type { ScenarioMap as MapType } from "@/lib/scenarioMap/types";
@@ -160,6 +160,42 @@ describe("ScenarioMap", () => {
     expect(screen.getByDisplayValue("From a link, no reload")).toBeTruthy();
     setHashAndFire("#m=rubbish");
     expect(screen.getByDisplayValue("From a link, no reload")).toBeTruthy();
+  });
+
+  it("dragging an added estimate's track marks the map dirty, so Save forks the built-in", async () => {
+    // The track's reference rect, stubbed the same way as EstimateTrack's own
+    // tests - jsdom has no layout, and both MapView and NodeList read real
+    // screen geometry off this element by design.
+    const rectSpy = vi
+      .spyOn(SVGElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ left: 0, width: 200, top: 0, height: 16, right: 200, bottom: 16, x: 0, y: 0, toJSON() {} } as DOMRect);
+
+    render(<ScenarioMap markets={board} />);
+    // Built-in maps carry no input node (their legs are all live markets), so
+    // one has to be added before there is anything to drag.
+    fireEvent.click(screen.getByRole("button", { name: /add estimate/i }));
+
+    // Both MapView and NodeList render a track for the new node (they are
+    // NOT gated behind opening the NodeList row), so there are two handles
+    // for the same node; dragging either one goes through the same onChange.
+    const handle = screen.getAllByRole("slider")[0];
+    fireEvent.pointerDown(handle, { clientX: 180, pointerId: 1 }); // fraction 0.9, far past the default 0.35
+    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    const saved = loadSaved();
+    expect(saved).toHaveLength(1);
+    // Forked, not overwriting the built-in: proves the drag kept the map
+    // marked dirty against a built-in exactly as typing into the node list does.
+    expect(saved[0].builtIn).toBeUndefined();
+    expect(saved[0].id).not.toBe("recession");
+    const draggedNode = saved[0].nodes.find((n) => n.kind === "input")!;
+    // And the SAVED node carries the post-drag value, not the 0.35 it had the
+    // moment "Add estimate" was clicked - proving the drag's data, not just
+    // the dirty flag, reached what got saved.
+    expect(draggedNode.kind === "input" && draggedNode.likely).toBeGreaterThan(0.5);
+
+    rectSpy.mockRestore();
   });
 
   it("removes the hashchange listener on unmount", () => {

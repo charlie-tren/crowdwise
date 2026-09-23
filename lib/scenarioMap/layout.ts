@@ -6,7 +6,14 @@ export const NODE_W = 168;
 // so a depends node's two conditional branches stay distinguishable instead
 // of both truncating to the same text. GAP_Y is left as is; at this NODE_H
 // the ratio between the two is still comfortable.
-export const NODE_H = 72;
+//
+// 88, not 72: an input node's box now holds a drag track along its bottom
+// edge (see EstimateTrack.tsx), which needs room below the value/range text.
+// Every node in a column shares one height regardless of kind, so a market
+// or formula box grows the same 16px even though it carries no track - the
+// alternative, a per-kind box height, would misalign every row in a column
+// that mixes kinds, which is worse than some empty space under a market box.
+export const NODE_H = 88;
 const GAP_X = 56;
 const GAP_Y = 22;
 const PAD = 8;

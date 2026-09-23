@@ -2,9 +2,10 @@
 import { useEffect, useRef, useState } from "react";
 import { pctScenario } from "@/lib/format";
 import { layoutMap, NODE_H, NODE_W } from "@/lib/scenarioMap/layout";
-import type { NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
+import type { InputNode, MapNode, NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
 import { THEME_COLOURS } from "@/lib/themeColours";
 import type { Market } from "@/lib/types";
+import { EstimateTrack } from "./EstimateTrack";
 
 // Kind, not probability. The blue ramp in lib/format.ts means magnitude, so it
 // cannot be reused here: a node's colour has to say what KIND of number it is.
@@ -78,13 +79,22 @@ export function wrapLabel(
   return lines;
 }
 
+// The track sits inset from the box edges by the same 10px the label and
+// figure text already use, so its ends line up with them rather than
+// bleeding to the box border.
+const TRACK_INSET = 10;
+const TRACK_WIDTH = NODE_W - TRACK_INSET * 2;
+// A few px up from the bottom edge, clear of the rounded corners.
+const TRACK_Y = NODE_H - 18;
+
 export function MapView({
-  map, results, markets = [], width: fixedWidth,
+  map, results, markets = [], width: fixedWidth, onChange,
 }: {
   map: ScenarioMap;
   results: Map<string, NodeResult>;
   markets?: Market[];
   width?: number;
+  onChange?: (next: ScenarioMap) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [measured, setMeasured] = useState(0);
@@ -133,6 +143,19 @@ export function MapView({
   // reads as a different, wrong sentence is worse than no reason at all.
   const truncate = (s: string, max: number): string =>
     s.length > max ? `${s.slice(0, max - 1)}…` : s;
+
+  // Only an input node is the reader's own judgement - a market is a live
+  // venue price and a formula is computed, so dragging either would assert a
+  // number nothing backs. Building a brand-new map object rather than
+  // mutating `map`: the built-in maps are rebuilt from the live board on
+  // every render, and mutating one here would corrupt that shared object.
+  const updateEstimate = (id: string, range: { low: number; likely: number; high: number }) => {
+    if (!onChange) return;
+    onChange({
+      ...map,
+      nodes: map.nodes.map((n) => (n.id === id ? ({ ...n, ...range } as MapNode) : n)),
+    });
+  };
 
   return (
     <div ref={box} className="hidden w-full overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:block">
@@ -194,6 +217,20 @@ export function MapView({
                   <text x={10} y={55} fontSize={10.5} fill="var(--muted-dim)">
                     {truncate(r?.reason ?? "Unresolved", 28)}
                   </text>
+                )}
+                {/* Only an input node gets a track - see updateEstimate above
+                    for why market and formula nodes never get one. Its
+                    presence (or absence) is the whole signal for "you can
+                    drag this one", with nothing written on the box to say so. */}
+                {node.kind === "input" && (
+                  <g transform={`translate(${TRACK_INSET}, ${TRACK_Y})`}>
+                    <EstimateTrack
+                      node={node as InputNode}
+                      units={TRACK_WIDTH}
+                      onChange={(range) => updateEstimate(node.id, range)}
+                      ariaLabel={`${node.label || "Estimate"} likelihood`}
+                    />
+                  </g>
                 )}
               </g>
             );
