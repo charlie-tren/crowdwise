@@ -23,7 +23,7 @@ describe("MapOutline", () => {
 
   it("prints the value of a resolved node", () => {
     render(<MapOutline map={map} results={evaluateMap(map, [])} />);
-    expect(screen.getByText("30%")).toBeTruthy();
+    expect(screen.getByText("30.00%")).toBeTruthy();
   });
 
   it("prints the reason instead of a number when a node is unresolved", () => {

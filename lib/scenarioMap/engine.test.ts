@@ -252,8 +252,16 @@ describe("evaluateMap", () => {
     const a = r.get("a")!, f = r.get("f")!;
     expect(a.p10!).toBeLessThan(a.p50!);
     expect(a.p90!).toBeGreaterThan(a.p50!);
-    // NOT flips the order of the percentiles, so the width survives.
-    expect(f.p90! - f.p10!).toBeCloseTo(a.p90! - a.p10!, 2);
+    // NOT flips the order of the percentiles, so the width survives - but a's
+    // width is now the exact closed-form width (see rng.ts sampleTriangular)
+    // while f's is still the empirical width of 4,000 sampled draws, so they
+    // are no longer the same float-for-float computation on the same sorted
+    // array. They agree only up to Monte Carlo sampling error (about 0.008
+    // per percentile at this draw count, per the DRAWS comment in engine.ts),
+    // hence the loose tolerance rather than the old 2-decimal-place match.
+    expect(f.p90! - f.p10!).toBeCloseTo(a.p90! - a.p10!, 1);
+    expect(f.p10!).toBeLessThan(f.p50!);
+    expect(f.p90!).toBeGreaterThan(f.p50!);
   });
 
   it("gives an unresolved node null figures and keeps its siblings", () => {
@@ -389,9 +397,16 @@ describe("evaluateMap", () => {
   it("produces exact figures pinned from the pre-optimisation engine, so a sampling-loop change cannot drift silently", () => {
     // Captured by running this exact map through evaluateMap before the
     // single-sort percentile change. A real input range, not a point, so the
-    // sort actually has work to do. If this test ever needs its numbers
-    // updated, that is a signal the sampling itself changed, not just its
-    // speed - stop and check why before touching the hard-coded values.
+    // sort actually has work to do. If f's numbers ever need updating, that is
+    // a signal the sampling itself changed, not just its speed - stop and
+    // check why before touching the hard-coded values.
+    //
+    // a's numbers are no longer a sampling pin: an input node's own p50/p10/p90
+    // are now the closed-form inverse-CDF values (sampleTriangular applied
+    // directly at q = 0.5/0.1/0.9), not the empirical percentile of 4,000
+    // draws, so they are exact rather than merely reproducible. f still reads
+    // a's draws from the seeded sampler exactly as before, so f's pinned
+    // values are unchanged.
     const r = evaluateMap(
       map(
         { id: "a", kind: "input", label: "A", low: 0.1, likely: 0.4, high: 0.9, source: "x" },
@@ -401,11 +416,110 @@ describe("evaluateMap", () => {
     );
     const a = r.get("a")!;
     const f = r.get("f")!;
-    expect(a.p50).toBe(0.4566768147412658);
-    expect(a.p10).toBe(0.26038053711951303);
-    expect(a.p90).toBe(0.6956081112149852);
+    expect(a.p50).toBe(0.4527864045000421);
+    expect(a.p10).toBe(0.2549193338482967);
+    expect(a.p90).toBe(0.7000000000000001);
     expect(f.p50).toBe(0.5433831591885494);
     expect(f.p10).toBe(0.3043918887850148);
     expect(f.p90).toBe(0.739619462880487);
+  });
+});
+
+describe("evaluateMap - an input node reports its own distribution exactly", () => {
+  // A triangular distribution over (low, likely, high) has a closed-form
+  // inverse CDF: sampleTriangular(low, likely, high, u) IS F^-1(u). An input
+  // node's true p50/p10/p90 are therefore that same function evaluated at
+  // u = 0.5/0.1/0.9, not the empirical percentile of a Monte Carlo sample -
+  // which carries sampling error that a reader would misread as their own
+  // typed number being wrong. These pin the exact closed-form values, hand
+  // verified against the formula in rng.ts, not just "close to" them.
+
+  it("reports p50 exactly 0.35, and p10/p90 matching the closed form to many decimal places", () => {
+    // low 0.25, likely 0.35, high 0.45, so this range is symmetric and 0.35
+    // is both the mode and the midpoint - the input a reader would type for
+    // "35%, roughly plus or minus 10 points either way".
+    // Exact p10 = 0.25 + sqrt(0.1 * 0.2 * 0.1) = 0.25 + sqrt(0.002)
+    // Exact p90 = 0.45 - sqrt(0.1 * 0.2 * 0.1) = 0.45 - sqrt(0.002)
+    const r = evaluateMap(
+      map({ id: "a", kind: "input", label: "A", low: 0.25, likely: 0.35, high: 0.45, source: "x" }),
+      [],
+    );
+    const a = r.get("a")!;
+    expect(a.p50).toBe(0.35);
+    expect(a.p10).toBeCloseTo(0.25 + Math.sqrt(0.002), 15);
+    expect(a.p90).toBeCloseTo(0.45 - Math.sqrt(0.002), 15);
+    // Not just close: this is the exact float the closed form produces, to
+    // full precision, which is the whole point - not rounded to two decimals.
+    expect(a.p10).toBe(0.2947213595499958);
+    expect(a.p90).toBe(0.4052786404500042);
+  });
+
+  it("reports exactly the same value for p50, p10 and p90 when low, likely and high are all equal", () => {
+    // A point estimate: the reader typed one number, not a range. There is
+    // no spread to sample error into, so all three figures must be that
+    // exact number, with no trace of Monte Carlo noise.
+    const r = evaluateMap(
+      map({ id: "a", kind: "input", label: "A", low: 0.35, likely: 0.35, high: 0.35, source: "x" }),
+      [],
+    );
+    const a = r.get("a")!;
+    expect(a.p50).toBe(0.35);
+    expect(a.p10).toBe(0.35);
+    expect(a.p90).toBe(0.35);
+  });
+
+  it("reports the correct closed-form percentiles for an asymmetric range, where likely is not the midpoint", () => {
+    // low 0.1, likely 0.7, high 0.8: the mode sits much closer to the high
+    // end than the low end, so a naive "spread evenly around likely" formula
+    // would get this wrong in a way the symmetric case above cannot catch.
+    // Worked by hand from sampleTriangular's inverse CDF:
+    //   span = 0.7, cut = (0.7-0.1)/0.7 = 0.857142857...
+    //   p50 (u=0.5 < cut): 0.1 + sqrt(0.5 * 0.7 * 0.6) = 0.1 + sqrt(0.21)
+    //   p10 (u=0.1 < cut): 0.1 + sqrt(0.1 * 0.7 * 0.6) = 0.1 + sqrt(0.042)
+    //   p90 (u=0.9 > cut): 0.8 - sqrt(0.1 * 0.7 * 0.1) = 0.8 - sqrt(0.007)
+    const r = evaluateMap(
+      map({ id: "a", kind: "input", label: "A", low: 0.1, likely: 0.7, high: 0.8, source: "x" }),
+      [],
+    );
+    const a = r.get("a")!;
+    expect(a.p50).toBeCloseTo(0.1 + Math.sqrt(0.21), 15);
+    expect(a.p10).toBeCloseTo(0.1 + Math.sqrt(0.042), 15);
+    expect(a.p90).toBeCloseTo(0.8 - Math.sqrt(0.007), 15);
+    expect(a.p50).toBe(0.558257569495584);
+    expect(a.p10).toBe(0.304939015319192);
+    expect(a.p90).toBe(0.7163339973465924);
+  });
+
+  it("still gives a formula reading that input a spread distribution: the change does not collapse a formula's uncertainty", () => {
+    // The input's own reported figures go exact, but the samples it feeds
+    // into a formula above it must still come from the seeded sampler, so
+    // the formula's p10 and p90 stay meaningfully apart.
+    const r = evaluateMap(
+      map(
+        { id: "a", kind: "input", label: "A", low: 0.1, likely: 0.7, high: 0.8, source: "x" },
+        { id: "f", kind: "formula", label: "F", op: "not", refs: ["a"] },
+      ),
+      [],
+    );
+    const f = r.get("f")!;
+    expect(f.status).toBe("ok");
+    expect(f.p10).not.toBe(f.p50);
+    expect(f.p90).not.toBe(f.p50);
+    expect(f.p90! - f.p10!).toBeGreaterThan(0.3);
+  });
+
+  it("leaves a market node unchanged: it was already exact, being a constant", () => {
+    const r = evaluateMap(
+      map({ id: "m", kind: "market", label: "M", marketId: "k1", side: "yes" }),
+      [{
+        id: "k1", platform: "Kalshi", title: "k1", category: "Rates/Fed", prob: 0.63, volume: 100,
+        endDate: "2026-12-31", status: "active", series: "KX", event: "",
+      }],
+    );
+    const m = r.get("m")!;
+    expect(m.status).toBe("ok");
+    expect(m.p50).toBe(0.63);
+    expect(m.p10).toBe(0.63);
+    expect(m.p90).toBe(0.63);
   });
 });

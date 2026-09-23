@@ -271,7 +271,13 @@ export function evaluateMap(
       }
       v = clamp01(v);
       draw.set(id, v);
-      samples.get(id)!.push(v);
+      // An input node's own reported p50/p10/p90 are computed analytically
+      // below, not from this sample - see the output loop. Its draws still
+      // land in `draw` above, unchanged, because those are what a formula
+      // reading this node multiplies/mixes/etc against; only the reporting
+      // path changes, not the feed. Skipping the push here is just not
+      // collecting samples nothing will read.
+      if (n.kind !== "input") samples.get(id)!.push(v);
     }
   }
 
@@ -291,10 +297,29 @@ export function evaluateMap(
       });
       continue;
     }
+    if (n.kind === "input") {
+      // Closed form, not sampled: a triangular distribution's inverse CDF is
+      // exactly sampleTriangular(low, likely, high, u), so the true q-th
+      // percentile is that function evaluated at u = q directly, with no
+      // Monte Carlo error to report back to a reader as if it were their own
+      // typed number. This is what an input node REPORTS; what it FEEDS to
+      // formulas above it is unchanged (see the draws loop above, which still
+      // draws this node from the seeded sampler for every formula that reads it).
+      out.set(n.id, {
+        id: n.id,
+        status: "ok",
+        p50: sampleTriangular(n.low, n.likely, n.high, 0.5),
+        p10: sampleTriangular(n.low, n.likely, n.high, 0.1),
+        p90: sampleTriangular(n.low, n.likely, n.high, 0.9),
+      });
+      continue;
+    }
     const xs = samples.get(n.id) ?? [];
     // One sort of this node's samples, not three: p50/p10/p90 all come off the
     // same sorted array via `percentiles` instead of each calling `percentile`
-    // (which sorts its own copy). See rng.ts.
+    // (which sorts its own copy). See rng.ts. Market nodes are constant, so
+    // every sample is identical and this already returns that exact constant -
+    // only formula nodes (and market, degenerately) still go through this path.
     const [p50, p10, p90] = percentiles(xs, [0.5, 0.1, 0.9]);
     out.set(n.id, { id: n.id, status: "ok", p50, p10, p90 });
   }

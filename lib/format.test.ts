@@ -29,14 +29,14 @@ describe("formatters", () => {
     it("never rounds a sub-certain probability up to 100%", () => {
       expect(pctScenario(0.996)).not.toBe("100%");
     });
-    it("still renders a genuine zero as 0%", () => {
-      expect(pctScenario(0)).toBe("0%");
+    it("still renders a genuine zero as 0.00%", () => {
+      expect(pctScenario(0)).toBe("0.00%");
     });
-    it("still renders a genuine one as 100%", () => {
-      expect(pctScenario(1)).toBe("100%");
+    it("still renders a genuine one as 100.00%", () => {
+      expect(pctScenario(1)).toBe("100.00%");
     });
-    it("keeps an ordinary mid-range value whole, no decimal", () => {
-      expect(pctScenario(0.38)).toBe("38%");
+    it("renders an ordinary mid-range value to two decimals", () => {
+      expect(pctScenario(0.38)).toBe("38.00%");
     });
     it("passes a null through the same as pct, without a fresh literal", () => {
       expect(pctScenario(null)).toBe(pct(null));
