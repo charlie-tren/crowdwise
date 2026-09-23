@@ -173,6 +173,54 @@ describe("resolveNodes", () => {
   });
 });
 
+describe("resolveNodes - market node override", () => {
+  it("resolves to the override, not the live board price", () => {
+    const r = resolveNodes(
+      map({ id: "a", kind: "market", label: "A", marketId: "k1", side: "yes", override: 0.9 }),
+      [mk("k1", 0.3)],
+    );
+    expect(r.get("a")!.status).toBe("ok");
+    expect(r.get("a")!.value).toBeCloseTo(0.9);
+  });
+
+  it("clearing the override (no override field at all) returns it to the live board price", () => {
+    const r = resolveNodes(
+      map({ id: "a", kind: "market", label: "A", marketId: "k1", side: "yes" }),
+      [mk("k1", 0.3)],
+    );
+    expect(r.get("a")!.value).toBeCloseTo(0.3);
+  });
+
+  it("still exposes the live board price for display when an override is set", () => {
+    // side "no": live = 1 - 0.3 = 0.7. The override lives in the same
+    // side-adjusted space as the node's own figure, so it does not get flipped
+    // again here.
+    const r = resolveNodes(
+      map({ id: "a", kind: "market", label: "A", marketId: "k1", side: "no", override: 0.9 }),
+      [mk("k1", 0.3)],
+    );
+    expect(r.get("a")!.livePrice).toBeCloseTo(0.7);
+    expect(r.get("a")!.value).toBeCloseTo(0.9);
+  });
+
+  it("a market with no live price on the board stays unresolved even with an override set - there is no live price to override", () => {
+    const r = resolveNodes(
+      map({ id: "a", kind: "market", label: "A", marketId: "gone", side: "yes", override: 0.9 }),
+      [mk("k1", 0.3)],
+    );
+    expect(r.get("a")!.status).toBe("unresolved");
+    expect(r.get("a")!.reason).toMatch(/no live market/i);
+  });
+
+  it("falls back to the live price rather than a confident out-of-range figure when the override is outside 0 to 1", () => {
+    const r = resolveNodes(
+      map({ id: "a", kind: "market", label: "A", marketId: "k1", side: "yes", override: 1.4 } as unknown as ScenarioMap["nodes"][number]),
+      [mk("k1", 0.3)],
+    );
+    expect(r.get("a")!.value).toBeCloseTo(0.3);
+  });
+});
+
 const point = (id: string, p: number): ScenarioMap["nodes"][number] =>
   ({ id, kind: "input", label: id, low: p, likely: p, high: p, source: "test" });
 
@@ -521,5 +569,59 @@ describe("evaluateMap - an input node reports its own distribution exactly", () 
     expect(m.p50).toBe(0.63);
     expect(m.p10).toBe(0.63);
     expect(m.p90).toBe(0.63);
+  });
+});
+
+describe("evaluateMap - market node override", () => {
+  it("a downstream formula changes when a market node is overridden", () => {
+    const withoutOverride = evaluateMap(
+      map(
+        { id: "a", kind: "market", label: "A", marketId: "k1", side: "yes" },
+        point("b", 0.5),
+        { id: "f", kind: "formula", label: "F", op: "and", refs: ["a", "b"] },
+      ),
+      [mk("k1", 0.3)],
+    );
+    const withOverride = evaluateMap(
+      map(
+        { id: "a", kind: "market", label: "A", marketId: "k1", side: "yes", override: 0.9 },
+        point("b", 0.5),
+        { id: "f", kind: "formula", label: "F", op: "and", refs: ["a", "b"] },
+      ),
+      [mk("k1", 0.3)],
+    );
+    expect(withoutOverride.get("f")!.p50).toBeCloseTo(0.15, 6); // 0.3 * 0.5
+    expect(withOverride.get("f")!.p50).toBeCloseTo(0.45, 6); // 0.9 * 0.5
+    expect(withOverride.get("f")!.p50).not.toBeCloseTo(withoutOverride.get("f")!.p50 as number, 3);
+  });
+
+  it("an overridden market node reports the override as its own figure, with the live price still reachable for display", () => {
+    const r = evaluateMap(
+      map({ id: "a", kind: "market", label: "A", marketId: "k1", side: "yes", override: 0.9 }),
+      [mk("k1", 0.3)],
+    );
+    const a = r.get("a")!;
+    expect(a.status).toBe("ok");
+    expect(a.p50).toBeCloseTo(0.9);
+    expect(a.livePrice).toBeCloseTo(0.3);
+  });
+
+  it("a market node with no override reports its live price as both its own figure and its livePrice", () => {
+    const r = evaluateMap(
+      map({ id: "a", kind: "market", label: "A", marketId: "k1", side: "yes" }),
+      [mk("k1", 0.3)],
+    );
+    const a = r.get("a")!;
+    expect(a.p50).toBeCloseTo(0.3);
+    expect(a.livePrice).toBeCloseTo(0.3);
+  });
+
+  it("gives an input node and a formula node no livePrice - only a market node carries one", () => {
+    const r = evaluateMap(
+      map(point("a", 0.5), { id: "f", kind: "formula", label: "F", op: "not", refs: ["a"] }),
+      [],
+    );
+    expect(r.get("a")!.livePrice).toBeFalsy();
+    expect(r.get("f")!.livePrice).toBeFalsy();
   });
 });

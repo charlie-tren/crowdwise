@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { pctScenario } from "@/lib/format";
-import type { MapNode, NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
+import type { InputNode, MapNode, MarketNode, NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
 import type { Market } from "@/lib/types";
 import { EstimateTrack, TRACK_H, TRACK_UNITS } from "./EstimateTrack";
 
@@ -48,6 +48,32 @@ export function NodeList({
 
   const replace = (id: string, patch: Partial<MapNode>) =>
     onChange({ ...map, nodes: map.nodes.map((n) => (n.id === id ? ({ ...n, ...patch } as MapNode) : n)) });
+
+  // A market node's live price is not the reader's to move - a drag on its
+  // track sets `override`, a separate what-if. See the matching comment on
+  // MapView's updateMarketOverride.
+  const updateMarketOverride = (id: string, value: number) =>
+    onChange({
+      ...map,
+      nodes: map.nodes.map((n) => (n.id === id && n.kind === "market" ? { ...n, override: value } : n)),
+    });
+
+  const clearMarketOverride = (id: string) =>
+    onChange({
+      ...map,
+      nodes: map.nodes.map((n) => (n.id === id && n.kind === "market" ? { ...n, override: undefined } : n)),
+    });
+
+  // See the matching, more fully commented copy of this in MapView.tsx: a
+  // market override is a single value, so EstimateTrack (built for a
+  // low/likely/high band) is handed a synthetic input-shaped node whose three
+  // fields are all the same number - a zero-width band, reusing dragMath.ts
+  // unmodified rather than building a second drag component.
+  const trackNodeFor = (node: MapNode, r?: NodeResult): InputNode => {
+    if (node.kind === "input") return node;
+    const v = (node as MarketNode).override ?? r?.livePrice ?? 0;
+    return { id: node.id, kind: "input", label: node.label, low: v, likely: v, high: v, source: "" };
+  };
 
   // Removing a node also removes every ref to it. A formula left pointing at a
   // deleted node would read "Missing input" for ever with nothing to click.
@@ -98,12 +124,33 @@ export function NodeList({
 
             {/* Reachable without opening the row - a phone is where dragging is
                 most natural, and a control only reachable after a tap plus a
-                drag is not reachable at all in practice. Only an input node
-                gets one; see MapView's updateEstimate comment for why a market
-                or formula node never does. Sibling to the button, not nested in
-                it, so the track's own focus/click never toggles the row open. */}
-            {node.kind === "input" && (
+                drag is not reachable at all in practice. An input node always
+                gets one; a market node gets one exactly when it has a live
+                price to drag away from (see MapView's matching comment). A
+                formula stays underived and never gets one. Sibling to the
+                button, not nested in it, so the track's own focus/click never
+                toggles the row open. */}
+            {(node.kind === "input" || (node.kind === "market" && r?.livePrice != null)) && (
               <div className="px-4 pb-3">
+                {/* The what-if figure is already the row's headline above;
+                    this is only the live price, subordinate, and the reset -
+                    the same job as the "live X%" text drawn on the node in
+                    MapView. A real <button>, not nested inside the row's own
+                    toggle button above (this div is that button's SIBLING). */}
+                {node.kind === "market" && (node as MarketNode).override != null && r?.livePrice != null && (
+                  <button
+                    type="button"
+                    onClick={() => clearMarketOverride(node.id)}
+                    // aria-label, not just the visible "live X%": the row's
+                    // own toggle button above already carries the text "Live
+                    // market" (see KIND_LABEL), so a name search for "live"
+                    // alone would match both buttons. "Reset" is unambiguous.
+                    aria-label={`Reset to the live price, ${pctScenario(r.livePrice)}`}
+                    className={`mb-1.5 block tabular-nums text-[11px] text-muted underline decoration-dotted hover:text-[var(--text)] ${FOCUS_RING}`}
+                  >
+                    live {pctScenario(r.livePrice)}
+                  </button>
+                )}
                 {/* overflow: visible - without it this SVG clips to its own
                     16px-tall viewport (the browser default for svg is
                     overflow: hidden), which would silently cut the drag
@@ -121,9 +168,17 @@ export function NodeList({
                   style={{ overflow: "visible" }}
                 >
                   <EstimateTrack
-                    node={node}
-                    onChange={(range) => replace(node.id, range as Partial<MapNode>)}
-                    ariaLabel={`${node.label || "Estimate"} likelihood`}
+                    node={trackNodeFor(node, r)}
+                    onChange={(range) =>
+                      node.kind === "input"
+                        ? replace(node.id, range as Partial<MapNode>)
+                        : updateMarketOverride(node.id, range.likely)
+                    }
+                    ariaLabel={
+                      node.kind === "input"
+                        ? `${node.label || "Estimate"} likelihood`
+                        : `${node.label || "Market"} what-if likelihood`
+                    }
                   />
                 </svg>
               </div>

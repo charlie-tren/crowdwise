@@ -109,6 +109,46 @@ describe("encodeMap / decodeMap", () => {
     };
     expect(decodeMap(encodeMap(bad as unknown as ScenarioMap))).toBeNull();
   });
+
+  it("round-trips a market node's override", () => {
+    const withOverride: ScenarioMap = {
+      id: "ov", name: "Override",
+      nodes: [{ id: "m1", kind: "market", label: "Fed cuts", marketId: "KX-1", side: "no", override: 0.42 }],
+    };
+    expect(decodeMap(encodeMap(withOverride))).toEqual(withOverride);
+  });
+
+  it("round-trips a market node with no override at all, unchanged", () => {
+    const noOverride: ScenarioMap = {
+      id: "no-ov", name: "No override",
+      nodes: [{ id: "m1", kind: "market", label: "Fed cuts", marketId: "KX-1", side: "no" }],
+    };
+    expect(decodeMap(encodeMap(noOverride))).toEqual(noOverride);
+  });
+
+  it("rejects an override outside 0 to 1, same as any other untrusted number reaching this boundary", () => {
+    const bad = {
+      id: "x", name: "x",
+      nodes: [{ id: "a", kind: "market", label: "A", marketId: "ma", side: "yes", override: 1.4 }],
+    };
+    expect(decodeMap(encodeMap(bad as unknown as ScenarioMap))).toBeNull();
+  });
+
+  it("rejects a non-numeric override", () => {
+    const bad = {
+      id: "x", name: "x",
+      nodes: [{ id: "a", kind: "market", label: "A", marketId: "ma", side: "yes", override: "90%" }],
+    };
+    expect(decodeMap(encodeMap(bad as unknown as ScenarioMap))).toBeNull();
+  });
+
+  it("rejects a negative override", () => {
+    const bad = {
+      id: "x", name: "x",
+      nodes: [{ id: "a", kind: "market", label: "A", marketId: "ma", side: "yes", override: -0.1 }],
+    };
+    expect(decodeMap(encodeMap(bad as unknown as ScenarioMap))).toBeNull();
+  });
 });
 
 describe("localStorage", () => {

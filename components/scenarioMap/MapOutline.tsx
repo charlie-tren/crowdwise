@@ -47,7 +47,14 @@ export function MapOutline({ map, results }: { map: ScenarioMap; results: Map<st
           <div className="text-[11px] text-muted">{node.source}</div>
         )}
         {node.kind === "market" && (
-          <div className="text-[11px] text-muted">{node.side === "no" ? "NO side" : "YES side"}</div>
+          <div className="text-[11px] text-muted">
+            {node.side === "no" ? "NO side" : "YES side"}
+            {/* Read-only here, unlike MapView/NodeList: no drag reaches this
+                narrow view, so no reset control either - just the same "the
+                reader can always see both numbers" requirement, in words
+                rather than a click target. */}
+            {node.override != null && r?.livePrice != null && ` · live ${pctScenario(r.livePrice)}`}
+          </div>
         )}
         {refs.length > 0 && (
           <ul className="ml-3 border-l border-white/[0.08] pl-3">

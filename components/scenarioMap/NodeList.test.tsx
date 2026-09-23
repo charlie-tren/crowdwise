@@ -132,23 +132,24 @@ describe("NodeList drag track", () => {
   it("gives an input node a slider track, always visible, not gated behind opening the row", () => {
     const { container } = render(<NodeList map={map} results={results()} markets={board} onChange={vi.fn()} />);
     // The row is not opened - no click on it - so this proves the track is
-    // reachable without expanding the editor.
-    expect(container.querySelectorAll("[data-estimate-track]")).toHaveLength(1);
-    expect(screen.getAllByRole("slider")).toHaveLength(1);
+    // reachable without expanding the editor. The market node ("k") also has
+    // a live price on this board, so it gets a track too: two in total.
+    expect(container.querySelectorAll("[data-estimate-track]")).toHaveLength(2);
+    expect(screen.getAllByRole("slider")).toHaveLength(2);
   });
 
-  it("gives no track to a market node or a formula node", () => {
+  it("gives a market node with a live price a track too, but a formula node still gets none", () => {
     const { container } = render(<NodeList map={map} results={results()} markets={board} onChange={vi.fn()} />);
-    // map has one input ("i"), one market ("k"), one formula ("f"); exactly
-    // one track total proves the other two kinds get none.
-    expect(container.querySelectorAll("[data-estimate-track]")).toHaveLength(1);
+    // map has one input ("i"), one market ("k", with a live price on `board`),
+    // one formula ("f"); two tracks total proves the formula gets none.
+    expect(container.querySelectorAll("[data-estimate-track]")).toHaveLength(2);
   });
 
   it("dragging the track calls onChange with a shifted, width-preserving range - the same path typing uses", async () => {
     const rectSpy = stubTrackRect(200, 0);
     const onChange = vi.fn();
     render(<NodeList map={map} results={results()} markets={board} onChange={onChange} />);
-    const handle = screen.getByRole("slider");
+    const handle = screen.getByRole("slider", { name: /my read/i });
     fireEvent.pointerDown(handle, { clientX: 160, pointerId: 1 }); // fraction 0.8
     await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
 
@@ -164,7 +165,7 @@ describe("NodeList drag track", () => {
     const rectSpy = stubTrackRect(200, 0);
     const onChange = vi.fn();
     render(<NodeList map={map} results={results()} markets={board} onChange={onChange} />);
-    const handle = screen.getByRole("slider");
+    const handle = screen.getByRole("slider", { name: /my read/i });
     fireEvent.pointerDown(handle, { clientX: 10, pointerId: 1 }); // fraction ~0.05, near the low end
     await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
 
@@ -182,7 +183,7 @@ describe("NodeList drag track", () => {
     const onChange = vi.fn();
     const original = JSON.parse(JSON.stringify(map));
     render(<NodeList map={map} results={results()} markets={board} onChange={onChange} />);
-    const handle = screen.getByRole("slider");
+    const handle = screen.getByRole("slider", { name: /my read/i });
     fireEvent.pointerDown(handle, { clientX: 180, pointerId: 1 });
     await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
 
@@ -194,10 +195,49 @@ describe("NodeList drag track", () => {
   it("arrow keys move the value and Home/End reach the ends of what the band's width allows", () => {
     const onChange = vi.fn();
     render(<NodeList map={map} results={results()} markets={board} onChange={onChange} />);
-    const handle = screen.getByRole("slider");
+    const handle = screen.getByRole("slider", { name: /my read/i });
     fireEvent.keyDown(handle, { key: "ArrowRight" });
     const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
     const edited = next.nodes.find((n) => n.id === "i")!;
     expect(edited.kind === "input" && edited.likely).toBeCloseTo(0.31);
+  });
+});
+
+describe("NodeList market override", () => {
+  it("dragging a market node's track sets an override, not the live price", async () => {
+    const rectSpy = stubTrackRect(200, 0);
+    const onChange = vi.fn();
+    render(<NodeList map={map} results={results()} markets={board} onChange={onChange} />);
+    const handle = screen.getByRole("slider", { name: /fed cuts/i });
+    fireEvent.pointerDown(handle, { clientX: 40, pointerId: 1 }); // fraction 0.2
+    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+
+    expect(onChange).toHaveBeenCalled();
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const edited = next.nodes.find((n) => n.id === "k")!;
+    expect(edited.kind === "market" && edited.override).toBeCloseTo(0.2, 1);
+    rectSpy.mockRestore();
+  });
+
+  it("shows the live price alongside an overridden market node's figure, and a reset returns it to live", () => {
+    const overridden: ScenarioMap = {
+      ...map,
+      nodes: map.nodes.map((n) => (n.id === "k" && n.kind === "market" ? { ...n, override: 0.1 } : n)),
+    };
+    const onChange = vi.fn();
+    render(<NodeList map={overridden} results={evaluateMap(overridden, board)} markets={board} onChange={onChange} />);
+    expect(screen.getByText("10.00%")).toBeTruthy(); // the what-if figure, in the row header
+    expect(screen.getByText(/80\.00%/)).toBeTruthy(); // the live price, subordinate
+
+    fireEvent.click(screen.getByRole("button", { name: /reset/i }));
+    expect(onChange).toHaveBeenCalled();
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const edited = next.nodes.find((n) => n.id === "k")!;
+    expect(edited.kind === "market" && edited.override).toBeUndefined();
+  });
+
+  it("does not show a live-price reset when there is no override to clear", () => {
+    render(<NodeList map={map} results={results()} markets={board} onChange={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /reset/i })).toBeNull();
   });
 });

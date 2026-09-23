@@ -53,6 +53,21 @@ describe("builtInMaps", () => {
     expect(m.nodes.some((n) => n.kind === "market" && n.marketId === "rec2")).toBe(true);
   });
 
+  it("gives every built-in map at least one draggable node - the whole reason to build this", () => {
+    // Draggable = an input node (this estate's built-ins carry none) or a
+    // market node whose live price actually resolved. Measured against a live
+    // board, all four built-ins used to be [market, market, formula], and the
+    // formula is never draggable (see the "formula nodes stay underived" note
+    // in engine.ts) - so before this change every one of them had zero.
+    for (const m of builtInMaps(board)) {
+      const r = evaluateMap(m, board);
+      const draggable = m.nodes.filter(
+        (n) => n.kind === "input" || (n.kind === "market" && r.get(n.id)?.livePrice != null),
+      );
+      expect(draggable.length).toBeGreaterThan(0);
+    }
+  });
+
   it("leaves a leg with no market unresolved and still resolves its sibling", () => {
     const thin = board.filter((m) => m.id !== "rec");
     const m = builtInMaps(thin).find((x) => x.id === "recession")!;

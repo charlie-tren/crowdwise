@@ -11,6 +11,13 @@ export interface MarketNode {
   label: string;
   marketId: string;      // Market.id from the board; "" when a leg has no market
   side: "yes" | "no";
+  // A reader's what-if for this node, in the SAME 0..1, side-adjusted space as
+  // the node's own displayed figure - not the raw venue price. Optional, and
+  // absent is the ordinary state: the live board price is used until a reader
+  // drags this node, exactly as with an input node's low/likely/high. The
+  // node's own live price is never altered or hidden by setting this - see
+  // NodeResult.livePrice, which always carries it separately for display.
+  override?: number;
 }
 
 export interface InputNode {
@@ -50,4 +57,11 @@ export interface NodeResult {
   p50: number | null;
   p10: number | null;
   p90: number | null;
+  // Market nodes only: the venue's own current price, side-adjusted the same
+  // way p50 is, independent of any what-if override on this node. Present
+  // whenever a market node has a usable live price, whether or not it is
+  // currently overridden - this is what lets the reader see the real number
+  // alongside a what-if. Absent (undefined) for input/formula nodes and for a
+  // market with no usable live price at all.
+  livePrice?: number | null;
 }
