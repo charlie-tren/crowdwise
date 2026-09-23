@@ -164,5 +164,10 @@ remains the right bet; the work above is hygiene, not a strategy.
 - Non-Fed verbose titles (WTI oil strikes, jobs, GDP, geopolitics) left deliberately - no
   clean universal transform; only Fed titles are canonicalised (`displayTitle`). WON'T-DO.
 - Dormant Metaculus integration (`lib/metaculus.ts`) - BLOCKED, revisit only if access opens.
+- Scenario Map shipped 23/09/2026, replacing the flat picker and the thesis-basket cards.
+  The four theses are now the built-in maps (`lib/scenarioMap/builtins.ts`) and resolve
+  through `lib/thesis.ts`'s predicates, so no market id is written down. If the Metaculus
+  token ever lands, a forecast node is a fourth node kind and nothing else changes.
+  Spec: `docs/superpowers/specs/2026-09-23-scenario-map-design.md`.
 - ~30 board rows show no trend sparkline: genuinely brand-new markets with <3 points of
   history even over 30d - BY DESIGN, don't "fix" by faking a line.
