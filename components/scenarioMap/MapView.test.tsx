@@ -416,6 +416,61 @@ describe("MapView node drag", () => {
   });
 });
 
+describe("MapView z-order", () => {
+  // Node "a" and node "b" are both in layer 0 of the derived layout, sorted
+  // by id ("a" before "b"), so with no stacking behaviour at all "a" paints
+  // BEFORE "b" and would end up buried underneath it if dragged on top.
+  const idOrder = (container: HTMLElement) =>
+    [...container.querySelectorAll("[data-node]")].map((g) => g.getAttribute("data-node-id"));
+
+  const drag = (rect: Element, pointerId: number, dx: number, dy: number) => {
+    fireEvent.pointerDown(rect, { clientX: 50, clientY: 50, pointerId });
+    fireEvent.pointerMove(rect, { clientX: 50 + dx, clientY: 50 + dy, pointerId });
+    fireEvent.pointerUp(rect, { clientX: 50 + dx, clientY: 50 + dy, pointerId });
+  };
+
+  it("paints a node after the one it was dragged onto the top of, so it is not left buried", () => {
+    const onChange = vi.fn();
+    const { container, rerender } = render(<MapView map={map} results={evaluateMap(map, [])} onChange={onChange} />);
+
+    expect(idOrder(container).indexOf("a")).toBeLessThan(idOrder(container).indexOf("b"));
+
+    const rectA = container.querySelector('[data-node-id="a"] rect')!;
+    drag(rectA, 1, 250, 250); // drag "a" onto/over "b"
+
+    const moved: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    // MapView is driven by the `map` prop; re-render with the moved map, the
+    // way ScenarioMap does after onChange, before reading paint order back.
+    rerender(<MapView map={moved} results={evaluateMap(moved, [])} onChange={onChange} />);
+
+    expect(idOrder(container).indexOf("a")).toBeGreaterThan(idOrder(container).indexOf("b"));
+    // The underlying node order - what the node list, outline and share
+    // payload read - is untouched. Only paint order moved.
+    expect(moved.nodes.map((n) => n.id)).toEqual(["a", "b", "f"]);
+  });
+
+  it("keeps the front node on top after the drag ends, and moves a different node to the front when IT is dragged out", () => {
+    const onChange = vi.fn();
+    const { container, rerender } = render(<MapView map={map} results={evaluateMap(map, [])} onChange={onChange} />);
+
+    drag(container.querySelector('[data-node-id="a"] rect')!, 1, 250, 250);
+    let moved: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    rerender(<MapView map={moved} results={evaluateMap(moved, [])} onChange={onChange} />);
+
+    // Nothing further has happened since the pointer was released: "a" is
+    // still the last thing painted, ie. still on top.
+    expect(idOrder(container).at(-1)).toBe("a");
+
+    // Now drag "b" - the node "a" is currently sitting on top of - out from
+    // underneath it.
+    drag(container.querySelector('[data-node-id="b"] rect')!, 2, -250, 250);
+    moved = onChange.mock.calls.at(-1)![0];
+    rerender(<MapView map={moved} results={evaluateMap(moved, [])} onChange={onChange} />);
+
+    expect(idOrder(container).at(-1)).toBe("b");
+  });
+});
+
 describe("MapView two-line labels", () => {
   const fedMap: ScenarioMap = {
     id: "fed", name: "fed",
