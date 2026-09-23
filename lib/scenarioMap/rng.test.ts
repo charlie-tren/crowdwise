@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { makeRng, sampleTriangular, percentile } from "./rng";
+import { makeRng, sampleTriangular, percentile, percentiles } from "./rng";
 
 describe("makeRng", () => {
   it("is deterministic for a seed", () => {
@@ -57,5 +57,39 @@ describe("percentile", () => {
 
   it("returns null for an empty sample", () => {
     expect(percentile([], 0.5)).toBeNull();
+  });
+});
+
+describe("percentiles", () => {
+  it("matches three separate percentile calls on the same sample", () => {
+    const xs = [5, 1, 4, 2, 3, 9, 7, 6, 8, 0];
+    const qs = [0.5, 0.1, 0.9];
+    expect(percentiles(xs, qs)).toEqual(qs.map((q) => percentile(xs, q)));
+  });
+
+  it("matches three separate percentile calls on a larger random-ish sample", () => {
+    const xs = Array.from({ length: 4000 }, (_, i) => Math.sin(i) * 1000);
+    const qs = [0.5, 0.1, 0.9];
+    expect(percentiles(xs, qs)).toEqual(qs.map((q) => percentile(xs, q)));
+  });
+
+  it("returns null for every quantile on an empty sample, matching percentile", () => {
+    const qs = [0.5, 0.1, 0.9];
+    expect(percentiles([], qs)).toEqual(qs.map((q) => percentile([], q)));
+    expect(percentiles([], qs)).toEqual([null, null, null]);
+  });
+
+  it("returns the single value for every quantile on a single-element sample, matching percentile", () => {
+    const xs = [42];
+    const qs = [0.5, 0.1, 0.9];
+    expect(percentiles(xs, qs)).toEqual(qs.map((q) => percentile(xs, q)));
+    expect(percentiles(xs, qs)).toEqual([42, 42, 42]);
+  });
+
+  it("does not mutate its input", () => {
+    const xs = [5, 1, 4, 2, 3];
+    const copy = [...xs];
+    percentiles(xs, [0.5, 0.1, 0.9]);
+    expect(xs).toEqual(copy);
   });
 });

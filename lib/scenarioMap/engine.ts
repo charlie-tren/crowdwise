@@ -1,6 +1,6 @@
 import type { Market } from "@/lib/types";
 import type { MapNode, NodeResult, Operator, ScenarioMap } from "./types";
-import { makeRng, percentile, sampleTriangular } from "./rng";
+import { makeRng, percentiles, sampleTriangular } from "./rng";
 
 /**
  * Monte Carlo draws. At 4,000 the standard error on a probability near 0.5 is
@@ -292,13 +292,11 @@ export function evaluateMap(
       continue;
     }
     const xs = samples.get(n.id) ?? [];
-    out.set(n.id, {
-      id: n.id,
-      status: "ok",
-      p50: percentile(xs, 0.5),
-      p10: percentile(xs, 0.1),
-      p90: percentile(xs, 0.9),
-    });
+    // One sort of this node's samples, not three: p50/p10/p90 all come off the
+    // same sorted array via `percentiles` instead of each calling `percentile`
+    // (which sorts its own copy). See rng.ts.
+    const [p50, p10, p90] = percentiles(xs, [0.5, 0.1, 0.9]);
+    out.set(n.id, { id: n.id, status: "ok", p50, p10, p90 });
   }
   return out;
 }

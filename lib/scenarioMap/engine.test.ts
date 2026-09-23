@@ -385,4 +385,27 @@ describe("evaluateMap", () => {
     expect(d.reason).toBeTruthy();
     expect(d.p50).toBeNull();
   });
+
+  it("produces exact figures pinned from the pre-optimisation engine, so a sampling-loop change cannot drift silently", () => {
+    // Captured by running this exact map through evaluateMap before the
+    // single-sort percentile change. A real input range, not a point, so the
+    // sort actually has work to do. If this test ever needs its numbers
+    // updated, that is a signal the sampling itself changed, not just its
+    // speed - stop and check why before touching the hard-coded values.
+    const r = evaluateMap(
+      map(
+        { id: "a", kind: "input", label: "A", low: 0.1, likely: 0.4, high: 0.9, source: "x" },
+        { id: "f", kind: "formula", label: "F", op: "not", refs: ["a"] },
+      ),
+      [],
+    );
+    const a = r.get("a")!;
+    const f = r.get("f")!;
+    expect(a.p50).toBe(0.4566768147412658);
+    expect(a.p10).toBe(0.26038053711951303);
+    expect(a.p90).toBe(0.6956081112149852);
+    expect(f.p50).toBe(0.5433831591885494);
+    expect(f.p10).toBe(0.3043918887850148);
+    expect(f.p90).toBe(0.739619462880487);
+  });
 });

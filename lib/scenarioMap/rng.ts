@@ -33,3 +33,19 @@ export function percentile(xs: number[], q: number): number | null {
   const i = Math.round(q * (sorted.length - 1));
   return sorted[Math.max(0, Math.min(sorted.length - 1, i))];
 }
+
+/**
+ * Several nearest-rank percentiles from one sort of `xs`, instead of one sort
+ * per quantile. Same nearest-rank rule as `percentile` for each `q`, applied
+ * to the same sorted copy, so the values are identical to calling `percentile`
+ * once per quantile - this exists purely to share the sort, not to change the
+ * arithmetic. `xs` is not mutated. Empty `xs` returns `null` for every `q`.
+ */
+export function percentiles(xs: number[], qs: number[]): (number | null)[] {
+  if (!xs.length) return qs.map(() => null);
+  const sorted = [...xs].sort((a, b) => a - b);
+  return qs.map((q) => {
+    const i = Math.round(q * (sorted.length - 1));
+    return sorted[Math.max(0, Math.min(sorted.length - 1, i))];
+  });
+}
