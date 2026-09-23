@@ -13,9 +13,16 @@ export function MapOutline({ map, results }: { map: ScenarioMap; results: Map<st
   for (const n of map.nodes) if (n.kind === "formula") for (const r of n.refs) read.add(r);
   const roots = map.nodes.filter((n) => !read.has(n.id));
 
+  // Every node the walk actually renders, wherever it lands in the tree. A node
+  // that only reads itself, or sits in a cycle with no node outside the cycle,
+  // is read by something and so is never a root: nothing below would ever recurse
+  // into it either, and it would vanish from the outline with its reason unread.
+  const rendered = new Set<string>();
+
   const renderNode = (id: string, seen: Set<string>) => {
     const node = byId.get(id);
     if (!node || seen.has(id)) return null;
+    rendered.add(id);
     const next = new Set(seen).add(id);
     const r = results.get(id);
     const refs = node.kind === "formula" ? node.refs.filter((x) => byId.has(x)) : [];
@@ -51,7 +58,23 @@ export function MapOutline({ map, results }: { map: ScenarioMap; results: Map<st
     );
   };
 
+  const rootItems = roots.map((n) => renderNode(n.id, new Set()));
+
+  // Anything the root walk never reached (entirely inside a cycle, with no
+  // root pointing into it) still needs to appear, so its reason is visible.
+  // Checked live against `rendered`, not a snapshot taken before this loop
+  // runs: rendering the first node of a cycle also renders the rest of that
+  // cycle underneath it, so later nodes in the same cycle are skipped here
+  // rather than appearing a second time at the top level.
+  const leftoverItems: ReturnType<typeof renderNode>[] = [];
+  for (const n of map.nodes) {
+    if (!rendered.has(n.id)) leftoverItems.push(renderNode(n.id, new Set()));
+  }
+
   return (
-    <ul className="sm:hidden">{roots.map((n) => renderNode(n.id, new Set()))}</ul>
+    <ul className="sm:hidden">
+      {rootItems}
+      {leftoverItems}
+    </ul>
   );
 }
