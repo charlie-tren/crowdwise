@@ -14,6 +14,36 @@
 
 ---
 
+## Corrections applied during execution
+
+Reviews found defects in the code this plan supplied. All are fixed on the branch;
+the task text above has been patched where a re-run could reintroduce them. Recorded
+here so the reasoning is not lost:
+
+- **A NaN market price resolved as a confident 0%** (commit `acc4ef3`). `priceById` was
+  built under `if (m.prob != null)` and pass 1 checked `if (p == null)`, and neither
+  catches NaN, so the clamp turned it into a tight, confident zero with no reason. This
+  is precisely the failure the feature exists to prevent. The test written to catch it
+  asserted only `p50 == null || Number.isFinite(p50)`, which passes on 0, so it could
+  never have come out negative. Both fixed, and the tightened test was proved to go red
+  against the unfixed code before the fix went back in.
+- **`REF_RULES[n.op]?.(...) ?? "Unknown operator"`** fired on `null`, the value a shape
+  rule returns to mean the shape is fine, so every valid operator reported itself
+  unknown (commit `c33e571`).
+- **The `mix` rule checked arity before the weight count**, hiding the specific fault
+  behind the vaguer one (commit `c33e571`).
+- **Cycle detection gives an imprecise REASON** where a node shares a convergence point
+  with an already-explored cycle: it reads "Depends on an unresolved input" rather than
+  "Circular". It is still correctly unresolved, so no figure is ever wrong. Left as is
+  rather than rewritten to Tarjan's SCC, with the limitation stated in the comment and
+  pinned by a test.
+- **`layoutMap`'s edge ARRAY order** depended on input node order even though its node
+  order did not. Made order-independent, and the determinism test now asserts it.
+- **`depends` was verified at one interior point**, where a swap of the two conditionals
+  still gives a plausible number. Boundary tests at condition 0 and 1 added.
+
+---
+
 ## File structure (locked before tasks)
 
 ```
@@ -430,6 +460,12 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
       const p = priceById.get(n.marketId);
       if (p == null) {
         res.set(n.id, { status: "unresolved", reason: "No live market on the board" });
+      } else if (!Number.isFinite(p)) {
+        // NOT covered by `p == null`: loose equality treats NaN as a usable number,
+        // so without this the clamp turns it into a confident 0% with a zero-width
+        // range and no reason. A different fact from an absent market, so a
+        // different sentence.
+        res.set(n.id, { status: "unresolved", reason: "Market price is not a usable number" });
       } else {
         res.set(n.id, { status: "ok", value: n.side === "no" ? 1 - p : p });
       }
@@ -652,8 +688,12 @@ describe("evaluateMap", () => {
       map({ id: "m", kind: "market", label: "M", marketId: "k1", side: "yes" }),
       bad,
     );
+    // Assert the STATUS, not just that the figure is finite: the broken version
+    // returned a perfectly finite 0, so `Number.isFinite(p50)` passed on it.
     const v = r.get("m")!;
-    expect(v.p50 == null || Number.isFinite(v.p50)).toBe(true);
+    expect(v.status).toBe("unresolved");
+    expect(v.reason).toMatch(/not a usable number/i);
+    expect([v.p50, v.p10, v.p90]).toEqual([null, null, null]);
   });
 
   it("keeps every result inside 0 to 1", () => {
