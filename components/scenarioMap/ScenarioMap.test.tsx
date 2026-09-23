@@ -24,6 +24,18 @@ const board: Market[] = [
   mk("cut", "Fed cut rates before 2027", "Rates/Fed", 0.8),
 ];
 
+// Sets the hash the way a same-document navigation would, then fires the
+// event by hand rather than trusting jsdom to raise it off the assignment:
+// this way the test proves the LISTENER works, not jsdom's location plumbing.
+const setHashAndFire = (hash: string) => {
+  window.location.hash = hash;
+  // fireEvent, not a raw window.dispatchEvent: it wraps the dispatch in
+  // act() so the resulting setState is flushed before the next assertion,
+  // same as a browser's own hashchange delivery would be by the time script
+  // after it runs.
+  fireEvent(window, new Event("hashchange"));
+};
+
 describe("ScenarioMap", () => {
   beforeEach(() => { window.localStorage.clear(); window.location.hash = ""; });
 
@@ -96,5 +108,69 @@ describe("ScenarioMap", () => {
 
   it("keeps the storage key stable", () => {
     expect(STORAGE_KEY).toBe("crowdwise.scenarioMaps.v1");
+  });
+
+  it("loads a map when the hash changes on an already-open page", () => {
+    render(<ScenarioMap markets={board} />);
+    const shared: MapType = {
+      id: "shared", name: "From a link, no reload",
+      nodes: [{ id: "a", kind: "input", label: "A", low: 0.4, likely: 0.4, high: 0.4, source: "x" }],
+    };
+    setHashAndFire(`#m=${encodeMap(shared)}`);
+    expect(screen.getByDisplayValue("From a link, no reload")).toBeTruthy();
+  });
+
+  it("does not write a map that arrived via hashchange to localStorage", () => {
+    render(<ScenarioMap markets={board} />);
+    const shared: MapType = {
+      id: "shared", name: "From a link, no reload",
+      nodes: [{ id: "a", kind: "input", label: "A", low: 0.4, likely: 0.4, high: 0.4, source: "x" }],
+    };
+    setHashAndFire(`#m=${encodeMap(shared)}`);
+    // Confirm the map actually loaded first: an empty-localStorage assertion
+    // alone would pass vacuously if the listener never fired at all.
+    expect(screen.getByDisplayValue("From a link, no reload")).toBeTruthy();
+    expect(loadSaved()).toEqual([]);
+  });
+
+  it("leaves the current map alone when the hash is emptied", () => {
+    render(<ScenarioMap markets={board} />);
+    const shared: MapType = {
+      id: "shared", name: "From a link, no reload",
+      nodes: [{ id: "a", kind: "input", label: "A", low: 0.4, likely: 0.4, high: 0.4, source: "x" }],
+    };
+    setHashAndFire(`#m=${encodeMap(shared)}`);
+    expect(screen.getByDisplayValue("From a link, no reload")).toBeTruthy();
+    // Clearing the fragment (eg. clicking a built-in chip elsewhere, then Back
+    // past it) must not yank the reader away from what they are looking at,
+    // and must not silently discard an unsaved edit.
+    setHashAndFire("");
+    expect(screen.getByDisplayValue("From a link, no reload")).toBeTruthy();
+  });
+
+  it("ignores a malformed hash arriving after mount and leaves the current map alone", () => {
+    render(<ScenarioMap markets={board} />);
+    const shared: MapType = {
+      id: "shared", name: "From a link, no reload",
+      nodes: [{ id: "a", kind: "input", label: "A", low: 0.4, likely: 0.4, high: 0.4, source: "x" }],
+    };
+    // Load a real shared map first, so this proves the listener ran and
+    // REJECTED the bad hash, not just that nothing was listening at all.
+    setHashAndFire(`#m=${encodeMap(shared)}`);
+    expect(screen.getByDisplayValue("From a link, no reload")).toBeTruthy();
+    setHashAndFire("#m=rubbish");
+    expect(screen.getByDisplayValue("From a link, no reload")).toBeTruthy();
+  });
+
+  it("removes the hashchange listener on unmount", () => {
+    const addSpy = vi.spyOn(window, "addEventListener");
+    const removeSpy = vi.spyOn(window, "removeEventListener");
+    const { unmount } = render(<ScenarioMap markets={board} />);
+    const registered = addSpy.mock.calls.find((c) => c[0] === "hashchange");
+    expect(registered).toBeTruthy();
+    unmount();
+    expect(removeSpy.mock.calls.some((c) => c[0] === "hashchange" && c[1] === registered?.[1])).toBe(true);
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
   });
 });

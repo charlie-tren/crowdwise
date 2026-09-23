@@ -62,6 +62,35 @@ export function ScenarioMap({ markets }: { markets: Market[] }) {
     if (fresh) setCurrent(fresh);
   }, [builtIns, current.id, dirty, shared]);
 
+  // A hash change on an already-open page is a same-document navigation:
+  // nothing remounts, so nothing re-runs the effect above. The Share button
+  // writes the hash with history.replaceState, which the spec does not fire
+  // hashchange for (confirmed against this file: onShare below is the only
+  // other place that touches the hash, and it calls replaceState, not
+  // pushState or a direct assignment), so this listener cannot hear its own
+  // writes and cannot loop.
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.match(/(?:^|#|&)m=([^&]+)/);
+      // An emptied or map-less hash leaves whatever is on screen alone: the
+      // reader may have unsaved edits, and snapping back to the default would
+      // throw those away with no warning.
+      if (!hash) return;
+      const fromLink = decodeMap(hash[1]);
+      // A malformed hash must not blank the page; decodeMap already returns
+      // null for anything it cannot parse, so just ignore it here.
+      if (!fromLink) return;
+      // Mirrors the mount-time hash load: an unsaved copy of the reader's
+      // own, not written to storage, and not folded into the current dirty
+      // edit so Save behaves the same way it would on a fresh page load.
+      setCurrent(fromLink);
+      setShared(true);
+      setDirty(false);
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
   const results = useMemo(() => evaluateMap(current, markets), [current, markets]);
 
   const edit = (next: MapType) => { setCurrent(next); setDirty(true); };
