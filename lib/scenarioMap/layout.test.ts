@@ -1,0 +1,87 @@
+import { describe, it, expect } from "vitest";
+import { layoutMap, NODE_W, NODE_H } from "./layout";
+import type { ScenarioMap } from "./types";
+
+const input = (id: string) =>
+  ({ id, kind: "input", label: id, low: 0.5, likely: 0.5, high: 0.5, source: "x" }) as const;
+
+const diamond: ScenarioMap = {
+  id: "d", name: "d",
+  nodes: [
+    input("a"),
+    { id: "l", kind: "formula", label: "L", op: "not", refs: ["a"] },
+    { id: "r", kind: "formula", label: "R", op: "not", refs: ["a"] },
+    { id: "top", kind: "formula", label: "T", op: "and", refs: ["l", "r"] },
+  ],
+};
+
+describe("layoutMap", () => {
+  it("puts a leaf in layer 0 and each formula one layer past its deepest input", () => {
+    const l = layoutMap(diamond, 900);
+    const layer = (id: string) => l.nodes.find((n) => n.id === id)!.layer;
+    expect(layer("a")).toBe(0);
+    expect(layer("l")).toBe(1);
+    expect(layer("r")).toBe(1);
+    expect(layer("top")).toBe(2);
+  });
+
+  it("places a node to the right of every node it reads", () => {
+    const l = layoutMap(diamond, 900);
+    const x = (id: string) => l.nodes.find((n) => n.id === id)!.x;
+    expect(x("top")).toBeGreaterThan(x("l"));
+    expect(x("l")).toBeGreaterThan(x("a"));
+  });
+
+  it("separates nodes sharing a layer by at least the node height", () => {
+    const l = layoutMap(diamond, 900);
+    const ys = l.nodes.filter((n) => n.layer === 1).map((n) => n.y).sort((p, q) => p - q);
+    expect(ys[1] - ys[0]).toBeGreaterThanOrEqual(NODE_H);
+  });
+
+  it("emits one edge per ref, pointing from the input to the reader", () => {
+    const l = layoutMap(diamond, 900);
+    expect(l.edges).toHaveLength(4); // a->l, a->r, l->top, r->top
+    expect(l.edges.every((e) => e.path.startsWith("M"))).toBe(true);
+    expect(l.edges.some((e) => e.from === "a" && e.to === "l")).toBe(true);
+  });
+
+  it("is deterministic and independent of node order in the array", () => {
+    const shuffled: ScenarioMap = { ...diamond, nodes: [...diamond.nodes].reverse() };
+    const a = layoutMap(diamond, 900).nodes.map((n) => `${n.id}:${n.layer}`).sort();
+    const b = layoutMap(shuffled, 900).nodes.map((n) => `${n.id}:${n.layer}`).sort();
+    expect(a).toEqual(b);
+  });
+
+  it("keeps every node inside the reported canvas", () => {
+    const l = layoutMap(diamond, 900);
+    for (const n of l.nodes) {
+      expect(n.x - NODE_W / 2).toBeGreaterThanOrEqual(0);
+      expect(n.x + NODE_W / 2).toBeLessThanOrEqual(l.width);
+      expect(n.y - NODE_H / 2).toBeGreaterThanOrEqual(0);
+      expect(n.y + NODE_H / 2).toBeLessThanOrEqual(l.height);
+    }
+  });
+
+  it("drops a ref that names nothing rather than drawing an edge to nowhere", () => {
+    const broken: ScenarioMap = {
+      id: "b", name: "b",
+      nodes: [input("a"), { id: "f", kind: "formula", label: "F", op: "and", refs: ["a", "ghost"] }],
+    };
+    const l = layoutMap(broken, 900);
+    expect(l.edges).toHaveLength(1);
+    expect(l.nodes).toHaveLength(2);
+  });
+
+  it("handles a cycle without looping forever", () => {
+    const cyclic: ScenarioMap = {
+      id: "c", name: "c",
+      nodes: [
+        { id: "f", kind: "formula", label: "F", op: "not", refs: ["g"] },
+        { id: "g", kind: "formula", label: "G", op: "not", refs: ["f"] },
+      ],
+    };
+    const l = layoutMap(cyclic, 900);
+    expect(l.nodes).toHaveLength(2);
+    expect(l.nodes.every((n) => Number.isFinite(n.x) && Number.isFinite(n.y))).toBe(true);
+  });
+});
