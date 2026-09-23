@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vite
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import { MapView, wrapLabel } from "./MapView";
 import { evaluateMap } from "@/lib/scenarioMap/engine";
+import { layoutMap } from "@/lib/scenarioMap/layout";
 import type { ScenarioMap } from "@/lib/scenarioMap/types";
 import { THEME_COLOURS } from "@/lib/themeColours";
 import type { Market } from "@/lib/types";
@@ -347,6 +348,71 @@ describe("MapView market override", () => {
   it("does not show a live-price reset when there is no override to clear", () => {
     render(<MapView map={recessionMap} results={evaluateMap(recessionMap, board)} markets={board} onChange={vi.fn()} />);
     expect(screen.queryByRole("button", { name: /live/i })).toBeNull();
+  });
+});
+
+describe("MapView node drag", () => {
+  it("dragging the node body moves it and does not touch its value", () => {
+    const onChange = vi.fn();
+    const { container } = render(<MapView map={map} results={evaluateMap(map, [])} onChange={onChange} />);
+    const rect = container.querySelectorAll("[data-node] rect")[0]!;
+    fireEvent.pointerDown(rect, { clientX: 50, clientY: 50, pointerId: 1 });
+    fireEvent.pointerMove(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+
+    expect(onChange).toHaveBeenCalled();
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const moved = next.nodes.find((n) => n.id === "a")!;
+    expect(moved.position).toBeDefined();
+    expect(moved.kind === "input" && moved.low).toBe(0.3);
+    expect(moved.kind === "input" && moved.likely).toBe(0.3);
+    expect(moved.kind === "input" && moved.high).toBe(0.3);
+  });
+
+  it("moves the node by the same delta the pointer moved, from its rendered start position", () => {
+    const onChange = vi.fn();
+    const { container } = render(<MapView map={map} results={evaluateMap(map, [])} onChange={onChange} />);
+    // Node "a" starts at the very top of the derived layout here (its column's
+    // top row), so this only tests a downward/rightward move - an upward move
+    // would immediately hit the canvas-origin clamp, which is covered on its
+    // own in layout.test.ts.
+    const before = layoutMap(map, 900).nodes.find((n) => n.id === "a")!;
+    const rect = container.querySelectorAll("[data-node] rect")[0]!;
+    fireEvent.pointerDown(rect, { clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(rect, { clientX: 180, clientY: 140, pointerId: 1 }); // dx +80, dy +40
+    fireEvent.pointerUp(rect, { clientX: 180, clientY: 140, pointerId: 1 });
+
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const moved = next.nodes.find((n) => n.id === "a")!;
+    expect(moved.position!.x).toBeCloseTo(before.x + 80, 0);
+    expect(moved.position!.y).toBeCloseTo(before.y + 40, 0);
+  });
+
+  it("dragging the value track does not move the node", async () => {
+    const rectSpy = vi
+      .spyOn(SVGElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ left: 0, width: 100, top: 0, height: 16, right: 100, bottom: 16, x: 0, y: 0, toJSON() {} } as DOMRect);
+    const onChange = vi.fn();
+    render(<MapView map={map} results={evaluateMap(map, [])} onChange={onChange} />);
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { clientX: 90, pointerId: 1 });
+    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+
+    expect(onChange).toHaveBeenCalled();
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const edited = next.nodes.find((n) => n.id === "a")!;
+    expect(edited.position).toBeUndefined();
+    rectSpy.mockRestore();
+  });
+
+  it("does not move the node, or throw, when there is no onChange handler", () => {
+    const { container } = render(<MapView map={map} results={evaluateMap(map, [])} />);
+    const rect = container.querySelectorAll("[data-node] rect")[0]!;
+    expect(() => {
+      fireEvent.pointerDown(rect, { clientX: 50, clientY: 50, pointerId: 1 });
+      fireEvent.pointerMove(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+      fireEvent.pointerUp(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+    }).not.toThrow();
   });
 });
 

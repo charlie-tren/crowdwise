@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { pctScenario } from "@/lib/format";
-import { layoutMap, NODE_H, NODE_W } from "@/lib/scenarioMap/layout";
+import { layoutMap, NODE_H, NODE_W, PAD } from "@/lib/scenarioMap/layout";
 import type { InputNode, MapNode, MarketNode, NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
 import { THEME_COLOURS } from "@/lib/themeColours";
 import type { Market } from "@/lib/types";
@@ -98,6 +98,80 @@ export function MapView({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [measured, setMeasured] = useState(0);
+
+  // Dragging a node's BODY moves it; dragging its value track (EstimateTrack,
+  // rendered as a sibling further down this same node group) changes its
+  // number. The two gestures are kept apart structurally, not by
+  // stopPropagation: these pointer handlers are attached only to the node's
+  // background <rect>, never to the wrapping <g> the track also lives in, so
+  // a pointerdown that lands on the track's hit circle is never even seen
+  // here - there is no shared ancestor for it to bubble through into. One
+  // node drags at a time, so a single ref (not one per node) is enough,
+  // mirroring EstimateTrack's own drag-state shape: a start snapshot, a
+  // throttling animation frame, and the not-yet-committed position it owes
+  // onChange.
+  const nodeDrag = useRef<{ id: string; startClientX: number; startClientY: number; startX: number; startY: number } | null>(null);
+  const nodeDragFrame = useRef<number | null>(null);
+  const pendingNodeDrag = useRef<{ id: string; x: number; y: number } | null>(null);
+
+  const clearNodeDragFrame = () => {
+    if (nodeDragFrame.current != null) {
+      cancelAnimationFrame(nodeDragFrame.current);
+      nodeDragFrame.current = null;
+    }
+  };
+  useEffect(() => () => {
+    clearNodeDragFrame();
+    pendingNodeDrag.current = null;
+  }, []);
+
+  const commitNodeDrag = (p: { id: string; x: number; y: number }) => {
+    if (!onChange) return;
+    onChange({
+      ...map,
+      nodes: map.nodes.map((n) => (n.id === p.id ? ({ ...n, position: { x: p.x, y: p.y } } as MapNode) : n)),
+    });
+  };
+
+  // Clamped to the exact same PAD/NODE_W/NODE_H margin layoutMap itself
+  // clamps a stored position to (see PAD's export there), so what the reader
+  // sees settle under their pointer during the drag is never a different
+  // place than where the next render's layoutMap will put it.
+  const clampToCanvas = (x: number, y: number) => ({
+    x: Math.max(PAD + NODE_W / 2, x),
+    y: Math.max(PAD + NODE_H / 2, y),
+  });
+
+  const onNodePointerDown = (e: React.PointerEvent<SVGRectElement>, id: string, startX: number, startY: number) => {
+    if (!onChange) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    nodeDrag.current = { id, startClientX: e.clientX, startClientY: e.clientY, startX, startY };
+  };
+
+  const onNodePointerMove = (e: React.PointerEvent<SVGRectElement>) => {
+    const s = nodeDrag.current;
+    if (!s) return;
+    const { x, y } = clampToCanvas(s.startX + (e.clientX - s.startClientX), s.startY + (e.clientY - s.startClientY));
+    clearNodeDragFrame();
+    pendingNodeDrag.current = { id: s.id, x, y };
+    nodeDragFrame.current = requestAnimationFrame(() => {
+      nodeDragFrame.current = null;
+      const toCommit = pendingNodeDrag.current;
+      pendingNodeDrag.current = null;
+      if (toCommit) commitNodeDrag(toCommit);
+    });
+  };
+
+  const endNodeDrag = () => {
+    nodeDrag.current = null;
+    // Same fast-drag fix as EstimateTrack's endDrag: flush whatever the last
+    // scheduled frame was about to commit right now, synchronously, rather
+    // than losing it to a frame that never got a chance to fire before release.
+    clearNodeDragFrame();
+    const toCommit = pendingNodeDrag.current;
+    pendingNodeDrag.current = null;
+    if (toCommit) commitNodeDrag(toCommit);
+  };
 
   useEffect(() => {
     if (fixedWidth != null || !box.current) return;
@@ -231,6 +305,11 @@ export function MapView({
                   fill="rgba(255,255,255,0.03)"
                   stroke={ok ? colour : "rgba(255,255,255,0.10)"}
                   strokeWidth={1}
+                  style={onChange ? { cursor: "grab", touchAction: "none" } : undefined}
+                  onPointerDown={onChange ? (e) => onNodePointerDown(e, ln.id, ln.x, ln.y) : undefined}
+                  onPointerMove={onChange ? onNodePointerMove : undefined}
+                  onPointerUp={onChange ? endNodeDrag : undefined}
+                  onPointerCancel={onChange ? endNodeDrag : undefined}
                 />
                 {labelLines.length > 0 && (
                   <text x={10} y={16} fontSize={11.5} fill="var(--text)">

@@ -222,6 +222,35 @@ describe("ScenarioMap", () => {
     rectSpy.mockRestore();
   });
 
+  it("dragging a node body marks the map dirty, so Save forks the built-in", () => {
+    const { container } = render(<ScenarioMap markets={board} />);
+    const rect = container.querySelectorAll("[data-node] rect")[0]!;
+    fireEvent.pointerDown(rect, { clientX: 50, clientY: 50, pointerId: 1 });
+    fireEvent.pointerMove(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    const saved = loadSaved();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].builtIn).toBeUndefined();
+    expect(saved[0].id).not.toBe("recession");
+    expect(saved[0].nodes.some((n) => n.position != null)).toBe(true);
+  });
+
+  it("shows a layout-reset control only once a node has been moved, and it clears every manual position", () => {
+    const { container } = render(<ScenarioMap markets={board} />);
+    expect(screen.queryByRole("button", { name: /reset layout/i })).toBeNull();
+
+    const rect = container.querySelectorAll("[data-node] rect")[0]!;
+    fireEvent.pointerDown(rect, { clientX: 50, clientY: 50, pointerId: 1 });
+    fireEvent.pointerMove(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(rect, { clientX: 300, clientY: 300, pointerId: 1 });
+
+    const resetBtn = screen.getByRole("button", { name: /reset layout/i });
+    fireEvent.click(resetBtn);
+    expect(screen.queryByRole("button", { name: /reset layout/i })).toBeNull();
+  });
+
   it("removes the hashchange listener on unmount", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
     const removeSpy = vi.spyOn(window, "removeEventListener");

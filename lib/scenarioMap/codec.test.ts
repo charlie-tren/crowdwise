@@ -149,6 +149,46 @@ describe("encodeMap / decodeMap", () => {
     };
     expect(decodeMap(encodeMap(bad as unknown as ScenarioMap))).toBeNull();
   });
+
+  it("round-trips a node's manual position", () => {
+    const withPos: ScenarioMap = {
+      id: "pos", name: "Positioned",
+      nodes: [{ id: "a", kind: "input", label: "A", low: 0.2, likely: 0.3, high: 0.4, source: "x", position: { x: 120, y: 80 } }],
+    };
+    expect(decodeMap(encodeMap(withPos))).toEqual(withPos);
+  });
+
+  it("round-trips a node with no position at all, unchanged", () => {
+    const noPos: ScenarioMap = {
+      id: "no-pos", name: "No position",
+      nodes: [{ id: "a", kind: "input", label: "A", low: 0.2, likely: 0.3, high: 0.4, source: "x" }],
+    };
+    expect(decodeMap(encodeMap(noPos))).toEqual(noPos);
+  });
+
+  it("rejects a position whose coordinates are not numbers", () => {
+    const bad = {
+      id: "x", name: "x",
+      nodes: [{ id: "a", kind: "input", label: "A", low: 0.2, likely: 0.3, high: 0.4, source: "x", position: { x: "left", y: 80 } }],
+    };
+    expect(decodeMap(encodeMap(bad as unknown as ScenarioMap))).toBeNull();
+  });
+
+  it("rejects a position that is not an object", () => {
+    const bad = {
+      id: "x", name: "x",
+      nodes: [{ id: "a", kind: "input", label: "A", low: 0.2, likely: 0.3, high: 0.4, source: "x", position: "middle" }],
+    };
+    expect(decodeMap(encodeMap(bad as unknown as ScenarioMap))).toBeNull();
+  });
+
+  it("rejects a position missing one of its coordinates", () => {
+    const bad = {
+      id: "x", name: "x",
+      nodes: [{ id: "a", kind: "input", label: "A", low: 0.2, likely: 0.3, high: 0.4, source: "x", position: { x: 120 } }],
+    };
+    expect(decodeMap(encodeMap(bad as unknown as ScenarioMap))).toBeNull();
+  });
 });
 
 describe("localStorage", () => {

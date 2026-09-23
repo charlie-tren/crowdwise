@@ -53,6 +53,19 @@ const isNode = (n: unknown): n is MapNode => {
   if (!n || typeof n !== "object") return false;
   const o = n as Record<string, unknown>;
   if (typeof o.id !== "string" || typeof o.label !== "string") return false;
+  // Position is common to every kind (it is cosmetic, not part of what a node
+  // computes - see the comment on NodePosition in types.ts), so it is checked
+  // once here rather than duplicated in each kind's branch below. Same shape
+  // of check as override/weights above: a share link is exactly where a
+  // hand-edited or corrupted hash would try to smuggle a non-finite or
+  // missing coordinate through, and layoutMap's own clamp is defence in
+  // depth, not a substitute for rejecting it at the trust boundary.
+  if (o.position !== undefined) {
+    if (!o.position || typeof o.position !== "object") return false;
+    const p = o.position as Record<string, unknown>;
+    if (typeof p.x !== "number" || typeof p.y !== "number" || !Number.isFinite(p.x) || !Number.isFinite(p.y))
+      return false;
+  }
   if (o.kind === "market") {
     if (typeof o.marketId !== "string" || (o.side !== "yes" && o.side !== "no")) return false;
     // Optional what-if override, in the same 0..1 side-adjusted space as the
