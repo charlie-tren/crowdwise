@@ -41,23 +41,92 @@ const MONTHS = [
   "january", "february", "march", "april", "may", "june",
   "july", "august", "september", "october", "november", "december",
 ];
+const MONTH_ABBR = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
 function metricOf(t: string): string | null {
   if (/\bcpi\b|inflation/.test(t)) return "CPI inflation";
   if (/unemployment|jobless/.test(t)) return "Unemployment";
   if (/\bgdp\b/.test(t)) return "GDP growth";
+  // Production (a flow, barrels/day) and reserves (a stock, barrels) are a
+  // different QUANTITY to a settlement PRICE (dollars/barrel) - a ladder mixing
+  // them would fabricate a monotonicity violation out of unrelated units.
+  // Excluded rather than given their own metric bucket: today's board has one
+  // of each, nowhere near minRungs, so they can't form a real ladder either way.
+  if (/crude oil production|oil production|crude oil reserves|oil reserves|barrels per day|\bbpd\b/.test(t)) return null;
   if (/\bwti\b|crude|oil price|per barrel|oil settle/.test(t)) return "Oil price";
   if (/upper bound of the federal funds/.test(t)) return "Fed upper bound";
   if (/lower bound of the federal funds/.test(t)) return "Fed lower bound";
   return null;
 }
 
-function directionOf(t: string): Direction | null {
+const ABOVE_WORDS = "above|over|at least|or higher|reach|exceed|greater than|more than";
+const BELOW_WORDS = "below|under|or lower|less than";
+const COMPARATOR_RE = new RegExp(`(>|<|\\b(?:${ABOVE_WORDS})\\b|\\b(?:${BELOW_WORDS})\\b)`);
+const ABOVE_TOKEN_RE = new RegExp(`^(?:${ABOVE_WORDS})$`);
+
+// Finds the comparator (symbol or word) and where it starts/ends in the title,
+// so the threshold can be anchored to it rather than picked as the first
+// number anywhere in the string (which would just as happily grab the
+// day-of-month or the year off the end of the title). "or higher"/"or lower"
+// read BACKWARDS ("9% or higher") - the threshold precedes the comparator
+// there, not follows it - so that pair is flagged for the caller.
+function directionOf(t: string): { direction: Direction; start: number; end: number; backward: boolean } | null {
   // ranges ("between X and Y") are not a single-sided threshold - skip them
   if (/\bbetween\b/.test(t)) return null;
-  if (/\b(above|over|at least|or higher|reach|exceed|greater than|more than)\b/.test(t)) return "above";
-  if (/\b(below|under|or lower|less than)\b/.test(t)) return "below";
-  return null;
+  const cm = t.match(COMPARATOR_RE);
+  if (!cm) return null;
+  const token = cm[0];
+  const start = cm.index ?? 0;
+  const end = start + token.length;
+  const direction: Direction = token === ">" || ABOVE_TOKEN_RE.test(token) ? "above" : "below";
+  const backward = token === "or higher" || token === "or lower";
+  return { direction, start, end, backward };
+}
+
+// The threshold is the first number found immediately AFTER the comparator
+// ends - never a bare scan of the whole title. Percentage titles keep their
+// exact prior behaviour (351 live markets depend on this path); anything else
+// (a dollar price, a plain number, a USD/Bbl figure) falls through to a
+// general number.
+function parseThreshold(t: string, from: number): number | null {
+  const rest = t.slice(from);
+  const pctM = rest.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (pctM) return Number(pctM[1]);
+  const numM = rest.match(/\$?\s*(\d+(?:\.\d+)?)/);
+  return numM ? Number(numM[1]) : null;
+}
+
+// For the backward "X% or higher"/"X% or lower" phrasing, the threshold is the
+// number immediately BEFORE the comparator - anchored to the end of the
+// prefix, so an earlier unrelated number in the title (a year) is never picked
+// up in its place.
+function parseThresholdBefore(t: string, upto: number): number | null {
+  const prefix = t.slice(0, upto);
+  const m = prefix.match(/(\d+(?:\.\d+)?)\s*%?\s*$/);
+  return m ? Number(m[1]) : null;
+}
+
+// A "Month Day, Year" date in the title (an oil settlement date, a Fed meeting
+// date) is a sharper grouping key than year-or-year-month: several distinct
+// dates can share a year, or even a month - this board has three different WTI
+// settlement dates, all in 2026 - and merging them would splice unrelated
+// strike families into one fake ladder. Matches abbreviated ("Nov 3") or full
+// ("November 3") month names; falls back to the coarser year/year-month key
+// when no day is present (CPI/GDP/Unemployment titles read "...in July 2026").
+function periodOf(t: string): string | null {
+  const dateM = t.match(/\b([a-z]{3,9})\.?\s+(\d{1,2}),?\s+(20\d{2})\b/);
+  if (dateM) {
+    const abbrIdx = MONTH_ABBR.findIndex((mo) => dateM[1].startsWith(mo));
+    if (abbrIdx >= 0) {
+      const day = dateM[2].padStart(2, "0");
+      return `${dateM[3]}-${String(abbrIdx + 1).padStart(2, "0")}-${day}`;
+    }
+  }
+  const yearM = t.match(/\b(20\d{2})\b/);
+  if (!yearM) return null;
+  const year = yearM[1];
+  const monthIdx = MONTHS.findIndex((mo) => t.includes(mo));
+  return monthIdx >= 0 ? `${year}-${String(monthIdx + 1).padStart(2, "0")}` : year;
 }
 
 export function parseStrike(m: Market): StrikeMarket | null {
@@ -65,17 +134,15 @@ export function parseStrike(m: Market): StrikeMarket | null {
   const t = m.title.toLowerCase();
   const metric = metricOf(t);
   if (!metric) return null;
-  const direction = directionOf(t);
-  if (!direction) return null;
-  const pctM = t.match(/(\d+(?:\.\d+)?)\s*%/);
-  if (!pctM) return null;
-  const threshold = Number(pctM[1]);
-  const yearM = t.match(/\b(20\d{2})\b/);
-  if (!yearM) return null;
-  const year = yearM[1];
-  const monthIdx = MONTHS.findIndex((mo) => t.includes(mo));
-  const period = monthIdx >= 0 ? `${year}-${String(monthIdx + 1).padStart(2, "0")}` : year;
-  return { market: m, metric, period, threshold, direction, prob: m.prob };
+  const comparator = directionOf(t);
+  if (!comparator) return null;
+  const threshold = comparator.backward
+    ? parseThresholdBefore(t, comparator.start)
+    : parseThreshold(t, comparator.end);
+  if (threshold == null) return null;
+  const period = periodOf(t);
+  if (!period) return null;
+  return { market: m, metric, period, threshold, direction: comparator.direction, prob: m.prob };
 }
 
 // Build one ladder per (metric, period, direction) family that has at least
