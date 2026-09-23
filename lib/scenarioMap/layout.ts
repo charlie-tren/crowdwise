@@ -2,7 +2,11 @@ import type { ScenarioMap } from "./types";
 
 // Box geometry in CSS pixels. Positions below are CENTRES.
 export const NODE_W = 168;
-export const NODE_H = 56;
+// 72, not 56: the label now wraps to two lines (see wrapLabel in MapView.tsx)
+// so a depends node's two conditional branches stay distinguishable instead
+// of both truncating to the same text. GAP_Y is left as is; at this NODE_H
+// the ratio between the two is still comfortable.
+export const NODE_H = 72;
 const GAP_X = 56;
 const GAP_Y = 22;
 const PAD = 8;

@@ -21,6 +21,63 @@ const INPUT_COLOUR = "#8b93a7";
 const FORMULA_COLOUR = "#f5a524";
 const FALLBACK_MARKET_COLOUR = "#4c9be8";
 
+// A depends node's whole point is contrasting two conditional branches, eg.
+// "Recession, if the Fed cuts" against "Recession, if the Fed holds all
+// year". A single 22-char truncated line collapses both to "Recession, if
+// the Fed…", so the reader cannot tell the boxes apart. Two lines roughly
+// doubles what is visible, wrapping on word boundaries, and only reaches for
+// an ellipsis if the text still does not fit. Pure and deterministic - no
+// runtime measurement, same character budget the old single-line truncation
+// used, just spread over two lines.
+const LABEL_LINE_CHARS = 22;
+const LABEL_MAX_LINES = 2;
+
+export function wrapLabel(
+  label: string,
+  lineChars: number = LABEL_LINE_CHARS,
+  maxLines: number = LABEL_MAX_LINES,
+): string[] {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+
+  const lines: string[] = [];
+  let i = 0;
+
+  while (i < words.length && lines.length < maxLines) {
+    let line = "";
+    while (i < words.length) {
+      const word = words[i];
+      const candidate = line ? `${line} ${word}` : word;
+      if (candidate.length > lineChars) {
+        if (line === "") {
+          // A single word longer than a whole line: hard-truncate it rather
+          // than let it overflow the box.
+          line = word.length > lineChars ? `${word.slice(0, lineChars - 1)}…` : word;
+          i++;
+        }
+        break;
+      }
+      line = candidate;
+      i++;
+    }
+    lines.push(line);
+  }
+
+  // Words remain after filling every allowed line: the label still overflows,
+  // so mark the cut with an ellipsis (unless the loop above already put one
+  // there for an unbreakable word).
+  const overflow = i < words.length;
+  const lastIndex = lines.length - 1;
+  if (overflow && !lines[lastIndex].endsWith("…")) {
+    const room = lineChars - 1;
+    lines[lastIndex] = lines[lastIndex].length > room
+      ? `${lines[lastIndex].slice(0, room)}…`
+      : `${lines[lastIndex]}…`;
+  }
+
+  return lines;
+}
+
 export function MapView({
   map, results, markets = [], width: fixedWidth,
 }: {
@@ -90,6 +147,7 @@ export function MapView({
             const colour = colourFor(node);
             const ok = r?.status === "ok";
             const hasRange = ok && r.p10 != null && r.p90 != null && r.p90 - r.p10 > 0.005;
+            const labelLines = wrapLabel(node.label);
             return (
               <g key={ln.id} data-node transform={`translate(${ln.x - NODE_W / 2}, ${ln.y - NODE_H / 2})`}>
                 <rect
@@ -98,22 +156,26 @@ export function MapView({
                   stroke={ok ? colour : "rgba(255,255,255,0.10)"}
                   strokeWidth={1}
                 />
-                <text x={10} y={19} fontSize={11.5} fill="var(--text)">
-                  {truncate(node.label, 22)}
-                </text>
+                {labelLines.length > 0 && (
+                  <text x={10} y={16} fontSize={11.5} fill="var(--text)">
+                    {labelLines.map((line, i) => (
+                      <tspan key={i} x={10} dy={i === 0 ? 0 : 13}>{line}</tspan>
+                    ))}
+                  </text>
+                )}
                 {ok ? (
                   <>
-                    <text x={10} y={40} fontSize={17} fontWeight={600} fill={colour} style={{ fontVariantNumeric: "tabular-nums" }}>
+                    <text x={10} y={55} fontSize={17} fontWeight={600} fill={colour} style={{ fontVariantNumeric: "tabular-nums" }}>
                       {pctScenario(r.p50)}
                     </text>
                     {hasRange && (
-                      <text x={NODE_W - 10} y={40} textAnchor="end" fontSize={10.5} fill="var(--muted)" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      <text x={NODE_W - 10} y={55} textAnchor="end" fontSize={10.5} fill="var(--muted)" style={{ fontVariantNumeric: "tabular-nums" }}>
                         {pctScenario(r.p10)} to {pctScenario(r.p90)}
                       </text>
                     )}
                   </>
                 ) : (
-                  <text x={10} y={39} fontSize={10.5} fill="var(--muted-dim)">
+                  <text x={10} y={55} fontSize={10.5} fill="var(--muted-dim)">
                     {truncate(r?.reason ?? "Unresolved", 28)}
                   </text>
                 )}

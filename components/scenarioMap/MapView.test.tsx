@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MapView } from "./MapView";
+import { MapView, wrapLabel } from "./MapView";
 import { evaluateMap } from "@/lib/scenarioMap/engine";
 import type { ScenarioMap } from "@/lib/scenarioMap/types";
 import { THEME_COLOURS } from "@/lib/themeColours";
@@ -91,5 +91,65 @@ describe("MapView", () => {
     };
     render(<MapView map={near} results={evaluateMap(near, [])} />);
     expect(screen.queryByText("100%")).toBeNull();
+  });
+});
+
+// A `depends` map's whole point is contrasting two conditional branches. When
+// both truncate to the same 22 characters ("Recession, if the Fed…") the
+// reader cannot tell the boxes apart. wrapLabel is the pure, unit-testable
+// helper that fixes this: two lines instead of one, wrapped on word
+// boundaries, truncated with an ellipsis only if it still overflows.
+describe("wrapLabel", () => {
+  it("wraps the two Fed-conditional labels into different lines", () => {
+    const cuts = wrapLabel("Recession, if the Fed cuts");
+    const holds = wrapLabel("Recession, if the Fed holds all year");
+    expect(cuts.join("\n")).not.toBe(holds.join("\n"));
+    // Both must fit without an ellipsis: the source text says "both labels
+    // above fit comfortably in two lines".
+    expect(cuts.some((l) => l.includes("…"))).toBe(false);
+    expect(holds.some((l) => l.includes("…"))).toBe(false);
+  });
+
+  it("leaves a short label on one line, with no spurious second line", () => {
+    expect(wrapLabel("Recession")).toEqual(["Recession"]);
+  });
+
+  it("truncates a single word with no space to break on, rather than overflowing", () => {
+    const longWord = "Supercalifragilisticexpialidocioussupercalifragilisticexpialidocious";
+    const lines = wrapLabel(longWord);
+    expect(lines.length).toBeLessThanOrEqual(2);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(22);
+    expect(lines[lines.length - 1].endsWith("…")).toBe(true);
+  });
+
+  it("does not throw on an empty label", () => {
+    expect(() => wrapLabel("")).not.toThrow();
+    expect(wrapLabel("")).toEqual([]);
+  });
+});
+
+describe("MapView two-line labels", () => {
+  const fedMap: ScenarioMap = {
+    id: "fed", name: "fed",
+    nodes: [
+      { id: "cuts", kind: "input", label: "Recession, if the Fed cuts", low: 0.1, likely: 0.1, high: 0.1, source: "x" },
+      { id: "holds", kind: "input", label: "Recession, if the Fed holds all year", low: 0.2, likely: 0.2, high: 0.2, source: "x" },
+    ],
+  };
+
+  it("renders the two Fed-conditional nodes with different visible text", () => {
+    const { container } = render(<MapView map={fedMap} results={evaluateMap(fedMap, [])} />);
+    const groups = container.querySelectorAll("[data-node]");
+    expect(groups).toHaveLength(2);
+    const textOf = (g: Element) => g.querySelector("text")!.textContent;
+    expect(textOf(groups[0])).not.toBe(textOf(groups[1]));
+  });
+
+  it("does not throw and renders no label text for an empty label", () => {
+    const emptyLabel: ScenarioMap = {
+      id: "e", name: "e",
+      nodes: [{ id: "a", kind: "input", label: "", low: 0.1, likely: 0.1, high: 0.1, source: "x" }],
+    };
+    expect(() => render(<MapView map={emptyLabel} results={evaluateMap(emptyLabel, [])} />)).not.toThrow();
   });
 });
