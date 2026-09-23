@@ -55,6 +55,12 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
       const p = priceById.get(n.marketId);
       if (p == null) {
         res.set(n.id, { status: "unresolved", reason: "No live market on the board" });
+      } else if (!Number.isFinite(p)) {
+        // Loose `!= null` on the way into priceById does not catch NaN, so a
+        // broken price still lands here. This is a different fact from "no
+        // market": the market exists but its price cannot be trusted, so say so
+        // rather than let it silently become a confident 0 via clamp01.
+        res.set(n.id, { status: "unresolved", reason: "Market price is not a usable number" });
       } else {
         res.set(n.id, { status: "ok", value: n.side === "no" ? 1 - p : p });
       }
@@ -81,6 +87,10 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
       const node = byId.get(frame.id);
       if (frame.i === 0) {
         if (state.get(frame.id) === 2) { stack.pop(); continue; }
+        // Defensive symmetry with the state-2 check above, not a reachable path:
+        // a frame is only ever pushed for an id whose state is undefined (see
+        // the push below), and nothing else runs between a push and this frame
+        // becoming the top of the stack, so state can never be 1 here.
         if (state.get(frame.id) === 1) { stack.pop(); continue; }
         state.set(frame.id, 1);
         path.push(frame.id);
@@ -89,7 +99,17 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
       if (frame.i < refs.length) {
         const next = refs[frame.i++];
         if (state.get(next) === 1) {
-          // Everything from `next` to the top of the path is in the cycle.
+          // Everything from `next` to the top of the path is in the cycle
+          // currently on the stack. This only fires while `next` is still being
+          // explored (state 1). A node that instead reaches `next` after it has
+          // already finished (state 2) via a different branch gets no back edge
+          // recorded at all, even when it structurally sits on the same cycle:
+          // it falls through to whatever downstream reason applies instead of
+          // "Circular". That node is still correctly unresolved either way, so
+          // no figure is ever wrong, only the stated reason is less precise.
+          // Pinned example: the X/Y/Z/W shape in engine.test.ts, where Z shares
+          // W with the X/Y/W cycle and reads "Depends on an unresolved input"
+          // instead of "Circular".
           for (let k = path.lastIndexOf(next); k >= 0 && k < path.length; k++) inCycle.add(path[k]);
         } else if (state.get(next) !== 2 && byId.has(next)) {
           stack.push({ id: next, i: 0 });
@@ -134,6 +154,11 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
   const order: string[] = [];
   const placed = new Set<string>();
   const ok = map.nodes.filter((n) => res.get(n.id)?.status === "ok");
+  // Safety net, not an expected path: every ok node's refs are themselves ok
+  // (pass 3 only marks a formula ok once all its refs already are), so each
+  // pass here places at least one new node and the sort finishes in at most
+  // ok.length passes. A linear chain is the worst case, needing exactly that
+  // many; +1 leaves no room to spare. This guard is not expected to fire.
   let guard = ok.length + 1;
   while (order.length < ok.length && guard-- > 0) {
     for (const n of ok) {
@@ -149,9 +174,12 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
 // NaN-safe on purpose: `x < 0 ? 0 : x > 1 ? 1 : x` passes NaN straight through,
 // because both comparisons are false for it. A single NaN then reaches percentile,
 // where it corrupts the sort (a comparator returning NaN leaves the array in an
-// arbitrary order) and the figure comes out wrong with nothing to say so. The
-// input validation in resolveNodes should make this unreachable; this is the
-// backstop for when it is not.
+// arbitrary order) and the figure comes out wrong with nothing to say so.
+// resolveNodes now rejects a non-finite market price and a non-finite input
+// bound before either becomes a draw, and every formula operates only on refs
+// that are already resolved (and therefore already clamped), so a NaN should
+// no longer reach this function by the normal path. This is the backstop for
+// a path that check does not cover.
 const clamp01 = (x: number) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
 
 /**

@@ -27,7 +27,12 @@ export function layoutMap(map: ScenarioMap, width: number): MapLayout {
   };
 
   // Longest path from the leaves. `seen` breaks a cycle by treating the repeat
-  // as a leaf, so a half-built map still draws.
+  // as a leaf, so a half-built map still draws. For a genuinely cyclic map the
+  // layer that ends up cached for each node in the cycle depends on which
+  // top-level node the loop below reaches first, so cyclic layering is
+  // arbitrary and not worth making canonical. That is fine: the only
+  // requirement for a cyclic map is that layout terminates and draws
+  // something, which the `seen` guard already gives it.
   const layerCache = new Map<string, number>();
   const layerOf = (id: string, seen: Set<string>): number => {
     if (layerCache.has(id)) return layerCache.get(id)!;
@@ -82,15 +87,18 @@ export function layoutMap(map: ScenarioMap, width: number): MapLayout {
     });
   });
 
+  // Walk `nodes` (already laid out in deterministic, id/barycentre order), not
+  // `map.nodes`: the same graph supplied in a different node order must yield
+  // the same edge array, not just the same edge set.
   const edges: LayoutEdge[] = [];
-  for (const n of map.nodes) {
-    for (const ref of refsOf(n.id)) {
-      const from = pos.get(ref)!, to = pos.get(n.id)!;
+  for (const ln of nodes) {
+    for (const ref of refsOf(ln.id)) {
+      const from = pos.get(ref)!, to = pos.get(ln.id)!;
       const x1 = from.x + NODE_W / 2, x2 = to.x - NODE_W / 2;
       const mid = (x1 + x2) / 2;
       edges.push({
         from: ref,
-        to: n.id,
+        to: ln.id,
         path: `M ${x1} ${from.y} C ${mid} ${from.y}, ${mid} ${to.y}, ${x2} ${to.y}`,
       });
     }

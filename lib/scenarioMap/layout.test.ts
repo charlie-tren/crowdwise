@@ -47,9 +47,18 @@ describe("layoutMap", () => {
 
   it("is deterministic and independent of node order in the array", () => {
     const shuffled: ScenarioMap = { ...diamond, nodes: [...diamond.nodes].reverse() };
-    const a = layoutMap(diamond, 900).nodes.map((n) => `${n.id}:${n.layer}`).sort();
-    const b = layoutMap(shuffled, 900).nodes.map((n) => `${n.id}:${n.layer}`).sort();
-    expect(a).toEqual(b);
+    const a = layoutMap(diamond, 900);
+    const b = layoutMap(shuffled, 900);
+    // Node set: order-independent by construction (sorted by id, then by
+    // barycentre), so comparing as sets is enough.
+    const aNodes = a.nodes.map((n) => `${n.id}:${n.layer}`).sort();
+    const bNodes = b.nodes.map((n) => `${n.id}:${n.layer}`).sort();
+    expect(aNodes).toEqual(bNodes);
+    // Edge array: must match position for position, not just as a set, so the
+    // same graph in a different node order draws identically.
+    const aEdges = a.edges.map((e) => `${e.from}->${e.to}`);
+    const bEdges = b.edges.map((e) => `${e.from}->${e.to}`);
+    expect(aEdges).toEqual(bEdges);
   });
 
   it("keeps every node inside the reported canvas", () => {

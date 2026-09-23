@@ -86,6 +86,30 @@ describe("resolveNodes", () => {
     expect(r.get("g")!.reason).toMatch(/circular/i);
   });
 
+  it("gives the reason 'depends on an unresolved input' (not 'circular') to a node " +
+    "that shares a convergence point with an already-explored cycle - a known limitation " +
+    "of the single-pass DFS, pinned here so it stays a deliberate, visible choice", () => {
+    // X refs Y and Z; Y refs W; Z refs W; W refs X. All four are structurally on
+    // a cycle. The DFS explores X -> Y -> W first, finds the X/Y/W back edge and
+    // marks W done (state 2) before it ever walks the X -> Z -> W branch, so no
+    // back edge is recorded for Z. Z is still correctly unresolved (W is), the
+    // cascade is sound, only the stated reason is less precise than it could be.
+    const r = resolveNodes(
+      map(
+        { id: "x", kind: "formula", label: "X", op: "and", refs: ["y", "z"] },
+        { id: "y", kind: "formula", label: "Y", op: "not", refs: ["w"] },
+        { id: "z", kind: "formula", label: "Z", op: "not", refs: ["w"] },
+        { id: "w", kind: "formula", label: "W", op: "not", refs: ["x"] },
+      ),
+      [],
+    );
+    expect(r.get("x")!.reason).toMatch(/circular/i);
+    expect(r.get("y")!.reason).toMatch(/circular/i);
+    expect(r.get("w")!.reason).toMatch(/circular/i);
+    expect(r.get("z")!.status).toBe("unresolved");
+    expect(r.get("z")!.reason).toMatch(/unresolved input/i);
+  });
+
   it("rejects the wrong number of refs per operator", () => {
     const r = resolveNodes(
       map(
@@ -160,6 +184,27 @@ describe("evaluateMap", () => {
     expect(r.get("f")!.p50).toBeCloseTo(0.275, 6);
   });
 
+  it("DEPENDS collapses exactly to the 'if yes' branch when cond is 1", () => {
+    // Boundary check so a swap of refs[1]/refs[2] cannot hide inside a value
+    // that still looks plausible at cond = 0.25. yes and no are set far apart
+    // so a swap is unmissable.
+    const r = evaluateMap(
+      map(point("cond", 1), point("yes", 0.9), point("no", 0.1),
+        { id: "f", kind: "formula", label: "F", op: "depends", refs: ["cond", "yes", "no"] }),
+      [],
+    );
+    expect(r.get("f")!.p50).toBeCloseTo(0.9, 6);
+  });
+
+  it("DEPENDS collapses exactly to the 'if no' branch when cond is 0", () => {
+    const r = evaluateMap(
+      map(point("cond", 0), point("yes", 0.9), point("no", 0.1),
+        { id: "f", kind: "formula", label: "F", op: "depends", refs: ["cond", "yes", "no"] }),
+      [],
+    );
+    expect(r.get("f")!.p50).toBeCloseTo(0.1, 6);
+  });
+
   it("carries a range through a formula", () => {
     const r = evaluateMap(
       map(
@@ -198,9 +243,11 @@ describe("evaluateMap", () => {
     expect(evaluateMap(m, []).get("f")!.p50).toBe(evaluateMap(m, []).get("f")!.p50);
   });
 
-  it("never lets a non-finite value reach a percentile", () => {
-    // An out-of-order range is rejected by resolveNodes, so reach the clamp the
-    // only other way: a market whose price is already broken.
+  it("marks a market with a non-finite price unresolved instead of a confident figure", () => {
+    // A NaN price used to slip past the `!= null` checks and come out the other
+    // end as a tight, confident 0% (clamp01 silently turns NaN into 0). It must
+    // instead name its own reason and print no figures at all, same as any
+    // other broken node.
     const bad = [{
       id: "k1", platform: "Kalshi" as const, title: "x", category: "Rates/Fed" as const,
       prob: Number.NaN, volume: 1, endDate: "2026-12-31", status: "active", series: "KX", event: "",
@@ -210,7 +257,11 @@ describe("evaluateMap", () => {
       bad,
     );
     const v = r.get("m")!;
-    expect(v.p50 == null || Number.isFinite(v.p50)).toBe(true);
+    expect(v.status).toBe("unresolved");
+    expect(v.reason).toMatch(/not a usable number/i);
+    expect(v.p50).toBeNull();
+    expect(v.p10).toBeNull();
+    expect(v.p90).toBeNull();
   });
 
   it("keeps every result inside 0 to 1", () => {
