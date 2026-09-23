@@ -168,6 +168,27 @@ remains the right bet; the work above is hygiene, not a strategy.
   The four theses are now the built-in maps (`lib/scenarioMap/builtins.ts`) and resolve
   through `lib/thesis.ts`'s predicates, so no market id is written down. If the Metaculus
   token ever lands, a forecast node is a fourth node kind and nothing else changes.
-  Spec: `docs/superpowers/specs/2026-09-23-scenario-map-design.md`.
+  Spec: `docs/superpowers/specs/2026-09-23-scenario-map-design.md`. Merged to master
+  and live the same day.
+- **`pctScenario` is deliberately NOT `pct`, do not tidy them into one.** `pct(p, 0)`
+  renders 0.0045 as "0%", which asserts a thing cannot happen when the engine has just
+  computed 1-in-220 odds, and 0.996 as "100%". `pctScenario` keeps a decimal only in
+  those two bands. `pct` is left alone because seven other call sites depend on its
+  current output.
+- Two Scenario Map questions left open on purpose, both design rather than defect:
+  - The formula node is amber (`#f5a524`). It had to move off `#7cc4ff`, which is the
+    exact top stop of `probFill`'s ramp, but amber is already this site's warning colour
+    in `StrikeLadders` and the Fed charts, so a healthy node may read as a caution.
+  - On a phone the outline and the node list state the same figures twice. Desktop does
+    the same thing (picture, then list), so it was left rather than redesigned unasked.
+- Model-drafted maps: NOT built, and the obvious provider does not work. `CF_ACCOUNT_ID`
+  and `CF_API_TOKEN` are GitHub Actions secrets in `the-aftertimes` and `dystopianist`,
+  which a Vercel app cannot read, and that account's 10,000 neurons a day are already
+  exhausted periodically by the existing daily image jobs. A per-visitor endpoint would
+  also be an open relay on a site with no KV to rate-limit it. If this gets built, the
+  shape that fits is bring-your-own-key in `localStorage` with the browser calling the
+  provider directly, which keeps `/scenario` static and puts the quota on the user.
+  Drafting a map in conversation and pasting the share link already works today and
+  needs nothing.
 - ~30 board rows show no trend sparkline: genuinely brand-new markets with <3 points of
   history even over 30d - BY DESIGN, don't "fix" by faking a line.
