@@ -295,8 +295,10 @@ describe("EstimateTrack", () => {
   // itself never has to grow.
   it("gives the handle a hit target well past its own visible size, big enough for a touch target", () => {
     const { container, handle } = renderTrack();
+    // Three circles now: the hit target, the visible handle, and the focus
+    // ring added below - was 2 before the ring existed.
     const circles = container.querySelectorAll("circle");
-    expect(circles.length).toBe(2);
+    expect(circles.length).toBe(3);
     // The slider role belongs to the hit target, not the decorative circle -
     // that is what makes it the thing that is actually focusable and grabbable.
     expect(handle).toBe(circles[0]);
@@ -308,5 +310,45 @@ describe("EstimateTrack", () => {
     // The decorative circle must never steal a pointer event from the hit
     // target sitting behind/around it.
     expect(circles[1].getAttribute("style") ?? "").toMatch(/pointer-events:\s*none/);
+  });
+
+  // The regression: the focus ring used to be the browser's default outline
+  // on the 44px HIT_R circle, which is four times the visible handle, spills
+  // outside the node box and sits on top of the node's own range text. jsdom
+  // does not implement :focus-visible at all (confirmed separately - it
+  // returns false even on a real .focus() call), so these two tests can only
+  // check the static wiring: that the default outline is off, and that the
+  // hand-drawn ring is sized and positioned to the visible handle rather than
+  // the hit target. Whether it actually appears on keyboard focus and not on
+  // a mouse click is a real-browser check, not a jsdom one.
+  it("suppresses the browser's default focus outline on the hit target circle", () => {
+    const { container } = renderTrack();
+    const hit = container.querySelectorAll("circle")[0];
+    expect(hit.getAttribute("style") ?? "").toMatch(/outline:\s*none/);
+  });
+
+  it("draws a focus indicator sized and centred on the visible handle, not the larger hit target", () => {
+    const { container } = renderTrack();
+    const circles = container.querySelectorAll("circle");
+    const [hit, visible, ring] = circles;
+    const hitR = Number(hit.getAttribute("r"));
+    const visibleR = Number(visible.getAttribute("r"));
+    const ringR = Number(ring.getAttribute("r"));
+
+    // Hugs the visible handle - bigger than it, but nowhere near the hit
+    // target's 44px touch circle.
+    expect(ringR).toBeGreaterThan(visibleR);
+    expect(ringR).toBeLessThan(hitR / 2);
+    // Same centre as the visible handle, not (necessarily) drawn as the hit
+    // circle's own boundary.
+    expect(ring.getAttribute("cx")).toBe(visible.getAttribute("cx"));
+    expect(ring.getAttribute("cy")).toBe(visible.getAttribute("cy"));
+    // Decorative: never steals a pointer event, never read by a screen reader.
+    expect(ring.getAttribute("aria-hidden")).toBe("true");
+    expect(ring.getAttribute("style") ?? "").toMatch(/pointer-events:\s*none/);
+    // Wired to the hit target's own focus-visible state (a Tailwind
+    // peer/peer-focus-visible pairing), not drawn unconditionally.
+    expect(hit.getAttribute("class") ?? "").toMatch(/\bpeer\b/);
+    expect(ring.getAttribute("class") ?? "").toMatch(/peer-focus-visible/);
   });
 });

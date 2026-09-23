@@ -17,6 +17,14 @@ export const TRACK_UNITS = 240;
 export const TRACK_H = 16;
 const HANDLE_R = 5.5;
 const BAND_H = 4;
+// The focus ring belongs to the visible handle, not the 44px hit circle it
+// sits behind - a ring following HIT_R would be four times the handle it
+// belongs to, spill outside the node's rounded rectangle, and sit on top of
+// the node's own range text (see the MapView/NodeList geometry this was
+// checked against). RING_R hugs HANDLE_R with a couple of px of daylight so
+// it reads as a ring around the handle, not a smear over it.
+const RING_R = HANDLE_R + 2.5;
+const RING_STROKE_W = 1.5;
 // The visible handle is 11px across (2*HANDLE_R) wherever 1 unit is roughly
 // 1 screen px - a hard thing to hit with a thumb. HIT_R draws a separate,
 // invisible, larger circle underneath that carries the actual interaction
@@ -172,7 +180,14 @@ export function EstimateTrack({
           than the handle it sits behind, so there is something worth a
           thumb's worth of room to grab. Everything about the interaction -
           role, focus, pointer and key handling - lives here, not on the
-          circle a reader can see. */}
+          circle a reader can see.
+          The browser's own focus outline is suppressed (outline: none) and
+          replaced by the ring drawn below on the visible handle: this circle
+          is a Tailwind "peer", so the ring can react to ITS :focus-visible
+          state without following its own (44px, off-screen-looking) bounds.
+          :focus-visible rather than :focus means a mouse click that focuses
+          the control does not light the ring - only keyboard/programmatic
+          focus does. */}
       <circle
         role="slider"
         tabIndex={0}
@@ -181,11 +196,12 @@ export function EstimateTrack({
         aria-valuemax={100}
         aria-valuenow={Math.round(node.likely * 100)}
         aria-valuetext={`${Math.round(node.likely * 100)}%`}
+        className="peer"
         cx={likelyX}
         cy={TRACK_H / 2}
         r={HIT_R}
         fill="transparent"
-        style={{ touchAction: "none", cursor: "ew-resize" }}
+        style={{ touchAction: "none", cursor: "ew-resize", outline: "none" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
@@ -203,6 +219,24 @@ export function EstimateTrack({
         fill="#c7ccd8"
         stroke="#8b93a7"
         strokeWidth={1.5}
+        style={{ pointerEvents: "none" }}
+      />
+      {/* The focus ring itself: hugs the visible handle, hidden until the hit
+          target above is focus-visible. var(--accent) (the same blue every
+          other focusable control on the page rings with, see NodeList's
+          FOCUS_RING) reads against the node's dark fill, its muted-grey
+          border, AND the light-grey handle it surrounds - unlike white or
+          the amber already used for formula nodes, it cannot be mistaken for
+          either of those. */}
+      <circle
+        aria-hidden="true"
+        cx={likelyX}
+        cy={TRACK_H / 2}
+        r={RING_R}
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth={RING_STROKE_W}
+        className="opacity-0 transition-opacity peer-focus-visible:opacity-100"
         style={{ pointerEvents: "none" }}
       />
     </g>
