@@ -99,6 +99,20 @@ describe("MapOutline", () => {
     expect(screen.queryByText("100%")).toBeNull();
   });
 
+  it("shows the live price alongside an overridden market node's figure", () => {
+    const board = [{
+      id: "k1", platform: "Kalshi" as const, title: "x", category: "Growth/Recession" as const, prob: 0.09,
+      volume: 1, endDate: "2026-12-31", status: "active" as const, series: "KX", event: "",
+    }];
+    const overridden: ScenarioMap = {
+      id: "o", name: "o",
+      nodes: [{ id: "a", kind: "market", label: "Recession", marketId: "k1", side: "yes", override: 0.6 }],
+    };
+    render(<MapOutline map={overridden} results={evaluateMap(overridden, board)} />);
+    expect(screen.getByText("60.00%")).toBeTruthy();
+    expect(screen.getByText(/9\.00%/)).toBeTruthy();
+  });
+
   it("renders each node of an ordinary acyclic map exactly once at the top level", () => {
     const { container } = render(<MapOutline map={map} results={evaluateMap(map, [])} />);
     // "f" is the only root ("a" and "b" are each read by "f"). The fix for the

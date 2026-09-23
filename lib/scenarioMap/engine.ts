@@ -15,8 +15,12 @@ export const SEED = 0x5c3a41f0 >>> 0;
 export interface Resolution {
   status: "ok" | "unresolved";
   reason?: string;
-  /** Set for market nodes only: the constant they contribute to every draw. */
+  /** Set for market nodes only: the constant they contribute to every draw.
+   * This is the override when one is set, the live price otherwise. */
   value?: number;
+  /** Set for market nodes only: the venue's own current price, side-adjusted,
+   * regardless of whether an override is also set - see NodeResult.livePrice. */
+  livePrice?: number;
 }
 
 export interface ResolveResult {
@@ -71,6 +75,18 @@ const REF_RULES = new Map<Operator, (refs: string[], weights?: number[]) => stri
  */
 export const KNOWN_OPERATORS: Operator[] = Array.from(REF_RULES.keys());
 
+// Formula nodes stay underived - no drag, no override. A market node's
+// override is a single substituted number; dragging a formula's OUTPUT would
+// mean solving and/or/not/mix/depends backwards for a consistent set of input
+// values, which is a different, much harder feature (and for "and"/"or" over
+// more than one input, generally underdetermined - many input combinations
+// give the same product). If a reader needs to see that a combined figure is
+// not itself draggable, the honest fix is to make the underived-ness visible
+// on the node rather than pretend it works: eg. no track drawn at all (which
+// is already exactly what happens today - see the `node.kind === "market"`
+// checks in MapView.tsx/NodeList.tsx, never `formula`), or a small "computed"
+// label. Not built here; noted so a future session does not read the absence
+// of a track as an oversight.
 export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult {
   const byId = new Map<string, MapNode>(map.nodes.map((n) => [n.id, n]));
   const priceById = new Map<string, number>();
@@ -91,7 +107,17 @@ export function resolveNodes(map: ScenarioMap, markets: Market[]): ResolveResult
         // rather than let it silently become a confident 0 via clamp01.
         res.set(n.id, { status: "unresolved", reason: "Market price is not a usable number" });
       } else {
-        res.set(n.id, { status: "ok", value: n.side === "no" ? 1 - p : p });
+        const live = n.side === "no" ? 1 - p : p;
+        // The override lives in the same side-adjusted space as the node's
+        // own displayed figure (see the comment on MarketNode.override in
+        // types.ts), so it is used as-is here, with no second flip. This is
+        // not the trust boundary - codec.ts's isNode is (see its comment on
+        // the mix weights for why a share link gets validated there) - so an
+        // override that fails this check is treated as though none were set,
+        // falling back to the live price it stands in for, rather than
+        // poisoning a node that has a perfectly good real price to show.
+        const overridden = n.override != null && Number.isFinite(n.override) && n.override >= 0 && n.override <= 1;
+        res.set(n.id, { status: "ok", value: overridden ? n.override! : live, livePrice: live });
       }
     } else if (n.kind === "input") {
       const vals = [n.low, n.likely, n.high];
@@ -321,7 +347,10 @@ export function evaluateMap(
     // every sample is identical and this already returns that exact constant -
     // only formula nodes (and market, degenerately) still go through this path.
     const [p50, p10, p90] = percentiles(xs, [0.5, 0.1, 0.9]);
-    out.set(n.id, { id: n.id, status: "ok", p50, p10, p90 });
+    // livePrice was captured in pass 1, before any override was applied, and
+    // is carried through untouched here - it is what lets MapView/NodeList
+    // show the venue's own price alongside a what-if, unaffected by it.
+    out.set(n.id, { id: n.id, status: "ok", p50, p10, p90, livePrice: n.kind === "market" ? r.livePrice ?? null : undefined });
   }
   return out;
 }

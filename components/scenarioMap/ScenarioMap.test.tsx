@@ -198,6 +198,30 @@ describe("ScenarioMap", () => {
     rectSpy.mockRestore();
   });
 
+  it("dragging a market leg on the DEFAULT map sets an override and marks it dirty, so Save forks the built-in - nothing has to be added first", async () => {
+    const rectSpy = vi
+      .spyOn(SVGElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ left: 0, width: 200, top: 0, height: 16, right: 200, bottom: 16, x: 0, y: 0, toJSON() {} } as DOMRect);
+
+    render(<ScenarioMap markets={board} />);
+    // The default map opens with nothing added: both its legs are live
+    // markets on `board`, draggable from the moment the page loads. This is
+    // the whole point of the change under test.
+    const handle = screen.getAllByRole("slider")[0];
+    fireEvent.pointerDown(handle, { clientX: 180, pointerId: 1 }); // fraction 0.9
+    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    const saved = loadSaved();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].builtIn).toBeUndefined();
+    expect(saved[0].id).not.toBe("recession");
+    const draggedNode = saved[0].nodes.find((n) => n.kind === "market" && n.override != null);
+    expect(draggedNode).toBeTruthy();
+
+    rectSpy.mockRestore();
+  });
+
   it("removes the hashchange listener on unmount", () => {
     const addSpy = vi.spyOn(window, "addEventListener");
     const removeSpy = vi.spyOn(window, "removeEventListener");

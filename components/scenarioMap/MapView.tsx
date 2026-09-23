@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { pctScenario } from "@/lib/format";
 import { layoutMap, NODE_H, NODE_W } from "@/lib/scenarioMap/layout";
-import type { InputNode, MapNode, NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
+import type { InputNode, MapNode, MarketNode, NodeResult, ScenarioMap } from "@/lib/scenarioMap/types";
 import { THEME_COLOURS } from "@/lib/themeColours";
 import type { Market } from "@/lib/types";
 import { EstimateTrack } from "./EstimateTrack";
@@ -144,10 +144,14 @@ export function MapView({
   const truncate = (s: string, max: number): string =>
     s.length > max ? `${s.slice(0, max - 1)}…` : s;
 
-  // Only an input node is the reader's own judgement - a market is a live
-  // venue price and a formula is computed, so dragging either would assert a
-  // number nothing backs. Building a brand-new map object rather than
-  // mutating `map`: the built-in maps are rebuilt from the live board on
+  // An input node's low/likely/high ARE the reader's own judgement, so a drag
+  // there writes them directly. A market node's live price is not the
+  // reader's to move - dragging it instead sets `override`, a separate
+  // what-if that never touches the venue price a market node also carries
+  // (see NodeResult.livePrice). A formula is computed and stays underived -
+  // see the note on resolveNodes in engine.ts for why dragging one is a
+  // different feature, not built here. Building brand-new map objects rather
+  // than mutating `map`: the built-in maps are rebuilt from the live board on
   // every render, and mutating one here would corrupt that shared object.
   const updateEstimate = (id: string, range: { low: number; likely: number; high: number }) => {
     if (!onChange) return;
@@ -155,6 +159,39 @@ export function MapView({
       ...map,
       nodes: map.nodes.map((n) => (n.id === id ? ({ ...n, ...range } as MapNode) : n)),
     });
+  };
+
+  const updateMarketOverride = (id: string, value: number) => {
+    if (!onChange) return;
+    onChange({
+      ...map,
+      nodes: map.nodes.map((n) => (n.id === id && n.kind === "market" ? { ...n, override: value } : n)),
+    });
+  };
+
+  const clearMarketOverride = (id: string) => {
+    if (!onChange) return;
+    onChange({
+      ...map,
+      nodes: map.nodes.map((n) => (n.id === id && n.kind === "market" ? { ...n, override: undefined } : n)),
+    });
+  };
+
+  // EstimateTrack draws a low..high band around a likely point; a market
+  // override is a single value, not a band. Rather than build a second drag
+  // component, this hands EstimateTrack a synthetic input-shaped node whose
+  // low, likely and high are all the same number - a zero-width band. That is
+  // enough for dragMath.ts's shiftRange to work completely unmodified (the
+  // delta it applies moves all three together, clamped at 0/1 exactly as for
+  // a real band), and the band rectangle MapView/EstimateTrack draws between
+  // low and high collapses to Math.max(0, highX - lowX) = 0 - visually
+  // nothing but the handle, which is exactly what a single point should look
+  // like. The alternative (a boolean "single value" prop on EstimateTrack)
+  // would mean two rendering paths for the same maths; this needs none.
+  const trackNodeFor = (node: MapNode, r?: NodeResult): InputNode => {
+    if (node.kind === "input") return node;
+    const v = (node as MarketNode).override ?? r?.livePrice ?? 0;
+    return { id: node.id, kind: "input", label: node.label, low: v, likely: v, high: v, source: "" };
   };
 
   return (
@@ -204,6 +241,10 @@ export function MapView({
                 )}
                 {ok ? (
                   <>
+                    {/* This is the node's headline figure: its own live price
+                        ordinarily, or the what-if override once one is set -
+                        the two are never shown in the same slot at once, which
+                        is what the subordinate live-price text below is for. */}
                     <text x={10} y={55} fontSize={17} fontWeight={600} fill={colour} style={{ fontVariantNumeric: "tabular-nums" }}>
                       {pctScenario(r.p50)}
                     </text>
@@ -212,23 +253,63 @@ export function MapView({
                         {pctScenario(r.p10)} to {pctScenario(r.p90)}
                       </text>
                     )}
+                    {/* A market node's own venue price, printed whenever an
+                        override is active - hasRange is always false for a
+                        market node (it is a constant, p10 === p50 === p90), so
+                        this never collides with the range text above. This is
+                        the whole answer to "can the reader tell a what-if from
+                        the real thing": the big figure is whichever one is
+                        current, and this quiet "live X%" is only ever drawn
+                        when the two differ. It is also the reset - a click (or
+                        Enter/Space) clears the override, right where the drag
+                        happened, so getting back costs exactly what setting it
+                        did. */}
+                    {node.kind === "market" && (node as MarketNode).override != null && r.livePrice != null && (
+                      <text
+                        x={NODE_W - 10} y={55} textAnchor="end" fontSize={10.5} fill="var(--muted)"
+                        role="button" tabIndex={0}
+                        aria-label={`Clear the what-if and return to the live price, ${pctScenario(r.livePrice)}`}
+                        style={{
+                          fontVariantNumeric: "tabular-nums", cursor: "pointer",
+                          textDecoration: "underline", textDecorationStyle: "dotted",
+                        }}
+                        onClick={() => clearMarketOverride(node.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); clearMarketOverride(node.id); }
+                        }}
+                      >
+                        live {pctScenario(r.livePrice)}
+                      </text>
+                    )}
                   </>
                 ) : (
                   <text x={10} y={55} fontSize={10.5} fill="var(--muted-dim)">
                     {truncate(r?.reason ?? "Unresolved", 28)}
                   </text>
                 )}
-                {/* Only an input node gets a track - see updateEstimate above
-                    for why market and formula nodes never get one. Its
-                    presence (or absence) is the whole signal for "you can
-                    drag this one", with nothing written on the box to say so. */}
-                {node.kind === "input" && (
+                {/* An input node always gets a track; a market node gets one
+                    exactly when it has a live price to drag away from - a
+                    market missing from the board has nothing to override (see
+                    the engine.ts comment on resolveNodes). A formula stays
+                    underived and never gets one - see the note there. The
+                    track's presence (or absence) is the whole signal for "you
+                    can drag this one", with nothing written on the box to say
+                    so. */}
+                {(node.kind === "input" || (node.kind === "market" && r?.livePrice != null)) && (
                   <g transform={`translate(${TRACK_INSET}, ${TRACK_Y})`}>
                     <EstimateTrack
-                      node={node as InputNode}
+                      node={trackNodeFor(node, r)}
                       units={TRACK_WIDTH}
-                      onChange={(range) => updateEstimate(node.id, range)}
-                      ariaLabel={`${node.label || "Estimate"} likelihood`}
+                      onChange={(range) =>
+                        node.kind === "input"
+                          ? updateEstimate(node.id, range)
+                          : updateMarketOverride(node.id, range.likely)
+                      }
+                      ariaLabel={
+                        node.kind === "input"
+                          ? `${node.label || "Estimate"} likelihood`
+                          : `${node.label || "Market"} what-if likelihood`
+                      }
                     />
                   </g>
                 )}

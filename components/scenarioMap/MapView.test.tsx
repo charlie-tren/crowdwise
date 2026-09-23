@@ -269,6 +269,87 @@ describe("MapView drag track", () => {
   });
 });
 
+describe("MapView market override", () => {
+  const board: Market[] = [{
+    id: "k1", platform: "Kalshi", title: "Recession", category: "Growth/Recession", prob: 0.09,
+    volume: 1, endDate: "2026-12-31", status: "active", series: "KX", event: "",
+  }];
+  const recessionMap: ScenarioMap = {
+    id: "r", name: "r",
+    nodes: [{ id: "rec", kind: "market", label: "Recession", marketId: "k1", side: "yes" }],
+  };
+
+  function stubTrackRect(width = 100, left = 0) {
+    return vi
+      .spyOn(SVGElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ left, width, top: 0, height: 16, right: left + width, bottom: 16, x: left, y: 0, toJSON() {} });
+  }
+
+  it("gives a market node with a live price a track, same as an input node - this is the whole point", () => {
+    const { container } = render(
+      <MapView map={recessionMap} results={evaluateMap(recessionMap, board)} markets={board} onChange={vi.fn()} />,
+    );
+    expect(container.querySelectorAll("[data-estimate-track]")).toHaveLength(1);
+    expect(screen.getAllByRole("slider")).toHaveLength(1);
+  });
+
+  it("gives no track to a market node with no live price on the board", () => {
+    const gone: ScenarioMap = {
+      id: "g", name: "g",
+      nodes: [{ id: "rec", kind: "market", label: "Recession", marketId: "gone", side: "yes" }],
+    };
+    const { container } = render(
+      <MapView map={gone} results={evaluateMap(gone, board)} markets={board} onChange={vi.fn()} />,
+    );
+    expect(container.querySelectorAll("[data-estimate-track]")).toHaveLength(0);
+  });
+
+  it("dragging a market node's track sets an override, not the live price", async () => {
+    const rectSpy = stubTrackRect(100, 0);
+    const onChange = vi.fn();
+    render(<MapView map={recessionMap} results={evaluateMap(recessionMap, board)} markets={board} onChange={onChange} />);
+    const handle = screen.getByRole("slider");
+    fireEvent.pointerDown(handle, { clientX: 90, pointerId: 1 }); // fraction 0.9
+    await act(async () => { await new Promise<void>((resolve) => requestAnimationFrame(() => resolve())); });
+
+    expect(onChange).toHaveBeenCalled();
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const edited = next.nodes.find((n) => n.id === "rec")!;
+    expect(edited.kind === "market" && edited.override).toBeCloseTo(0.9, 1);
+    // The live board price is never touched by the drag itself.
+    rectSpy.mockRestore();
+  });
+
+  it("shows both the what-if figure and the live price, clearly different numbers", () => {
+    const overridden: ScenarioMap = {
+      id: "r", name: "r",
+      nodes: [{ id: "rec", kind: "market", label: "Recession", marketId: "k1", side: "yes", override: 0.6 }],
+    };
+    render(<MapView map={overridden} results={evaluateMap(overridden, board)} markets={board} />);
+    expect(screen.getByText("60.00%")).toBeTruthy(); // the what-if, the node's own figure
+    expect(screen.getByText(/9\.00%/)).toBeTruthy(); // the live price, subordinate
+  });
+
+  it("clicking the live price clears the override and returns the node to it", () => {
+    const overridden: ScenarioMap = {
+      id: "r", name: "r",
+      nodes: [{ id: "rec", kind: "market", label: "Recession", marketId: "k1", side: "yes", override: 0.6 }],
+    };
+    const onChange = vi.fn();
+    render(<MapView map={overridden} results={evaluateMap(overridden, board)} markets={board} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: /live/i }));
+    expect(onChange).toHaveBeenCalled();
+    const next: ScenarioMap = onChange.mock.calls.at(-1)![0];
+    const edited = next.nodes.find((n) => n.id === "rec")!;
+    expect(edited.kind === "market" && edited.override).toBeUndefined();
+  });
+
+  it("does not show a live-price reset when there is no override to clear", () => {
+    render(<MapView map={recessionMap} results={evaluateMap(recessionMap, board)} markets={board} onChange={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: /live/i })).toBeNull();
+  });
+});
+
 describe("MapView two-line labels", () => {
   const fedMap: ScenarioMap = {
     id: "fed", name: "fed",

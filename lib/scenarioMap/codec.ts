@@ -53,7 +53,18 @@ const isNode = (n: unknown): n is MapNode => {
   if (!n || typeof n !== "object") return false;
   const o = n as Record<string, unknown>;
   if (typeof o.id !== "string" || typeof o.label !== "string") return false;
-  if (o.kind === "market") return typeof o.marketId === "string" && (o.side === "yes" || o.side === "no");
+  if (o.kind === "market") {
+    if (typeof o.marketId !== "string" || (o.side !== "yes" && o.side !== "no")) return false;
+    // Optional what-if override, in the same 0..1 side-adjusted space as the
+    // node's own displayed figure. Same shape of check as the mix weights
+    // above - a share link is exactly where a hand-edited or corrupted hash
+    // would try to smuggle a non-numeric or out-of-range value through, and
+    // engine.ts's own fallback-to-live-price guard is defence in depth, not a
+    // substitute for rejecting it here at the trust boundary.
+    if (o.override !== undefined && !(typeof o.override === "number" && Number.isFinite(o.override) && o.override >= 0 && o.override <= 1))
+      return false;
+    return true;
+  }
   if (o.kind === "input")
     return ["low", "likely", "high"].every((k) => typeof o[k] === "number") && typeof o.source === "string";
   if (o.kind === "formula") {
