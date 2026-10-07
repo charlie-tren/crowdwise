@@ -106,10 +106,8 @@ must come from **synthesis + push**, not the dashboard. Growth is a content flyw
    sparkline needs no dates - the points are evenly spaced daily - so a probabilities-only
    array costs ~650 bytes, +30% on a 2.2KB response. Negligible.
 
-   **Recommendation: build it, probs-only.** The series is already fetched and discarded,
-   `components/charts/Sparkline.tsx` already exists and is used by the board, and the
-   dumbbell cannot distinguish a steady drift from a spike-and-retrace, which is the
-   question a mover actually raises.
+   **Recommendation: build it, probs-only.** The dumbbell cannot distinguish a steady
+   drift from a spike-and-retrace, and the series is already fetched and discarded.
 
    **Not done unprompted because it adds a visual element to a panel**, and that is the
    class of change Charlie has rejected before (the per-row arrow on /research, the accent
