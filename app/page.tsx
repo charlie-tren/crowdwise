@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
 import { BoardView } from "@/components/BoardView";
 import { HeadlineOdds } from "@/components/HeadlineOdds";
@@ -16,6 +17,18 @@ import { buildEventCalendar } from "@/lib/calendar";
 import { buildSparklines } from "@/lib/sparklines";
 import { fetchKalshiMarketHistory, fetchPolymarketMarketHistory } from "@/lib/sources";
 import type { BoardPayload, Market } from "@/lib/types";
+
+/* The home page's description TAG is written for search and AI answer engines
+   and never shown to a reader (07/10/2026). og and twitter keep the visible lede,
+   so a shared link still says what the page says. Set here, not in the root
+   layout, so no other page inherits this og line. */
+const LEDE = "Live odds on macro events - Fed decisions, inflation, recessions - from Kalshi and Polymarket.";
+export const metadata: Metadata = {
+  description:
+    "Fed rate odds from prediction markets: the chance of a cut, hold or hike at each upcoming FOMC meeting, priced on Kalshi, plus live Kalshi and Polymarket odds on US recession, inflation and oil.",
+  openGraph: { title: "Crowdwise", description: LEDE },
+  twitter: { card: "summary_large_image", title: "Crowdwise", description: LEDE },
+};
 
 // ISR: the rendered board is cached and regenerated at most every 5 minutes, so
 // public traffic is served from cache rather than hitting the upstream APIs on

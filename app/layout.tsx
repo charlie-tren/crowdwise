@@ -14,7 +14,9 @@ export const metadata: Metadata = {
   // for word. Google ignores the description tag as often as not and builds its
   // own snippet from the h1 plus visible text, so the wanted sentence has to be
   // in both places or the snippet is whatever it picks. Same rule on every page
-  // below: each description is its page's lede verbatim.
+  // below: each description is its page's lede verbatim. EXCEPT the home page,
+  // which overrides its description tag for search and AI engines in
+  // app/page.tsx (07/10/2026) and keeps this lede for og and twitter.
   description: "Live odds on macro events - Fed decisions, inflation, recessions - from Kalshi and Polymarket.",
   alternates: { canonical: "/" },
 };
