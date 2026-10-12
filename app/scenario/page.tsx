@@ -5,7 +5,7 @@ import { fetchTopMarkets } from "@/lib/board";
 export const revalidate = 300;
 export const maxDuration = 60;
 export const metadata: Metadata = {
-  title: "Scenario Map · Crowdwise",
+  title: "Scenario Map - Crowdwise",
   // The page carries no standfirst: this sentence exists for a share card, where
   // a reader arriving cold needs it, and nobody on the page has to read it.
   description:

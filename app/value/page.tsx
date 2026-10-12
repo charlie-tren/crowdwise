@@ -9,7 +9,7 @@ import { fetchKalshiMarketHistory } from "@/lib/sources";
 export const revalidate = 300;
 export const maxDuration = 60;
 export const metadata: Metadata = {
-  title: "Relative value · Crowdwise",
+  title: "Relative value - Crowdwise",
   // Paired with the lede on this page - keep identical.
   description:
     "Market-implied strike ladders - the probability across thresholds for each macro metric, in effect the market's implied distribution.",
