@@ -26,7 +26,7 @@ export function makeKvStore(kv: KvLike, opts: { maxSnapshots?: number } = {}) {
 
   // Compute moves vs the latest snapshot, store the board, THEN append this
   // board as the new snapshot (matches the Streamlit order: delta first, save
-  // after — see 7_Macro_Signals.py::_ensure_board).
+  // after - see 7_Macro_Signals.py::_ensure_board).
   async function writeBoard(markets: Market[], fetchedAt: string): Promise<void> {
     const priorSnaps = await readSnapshots();
     const moves = computeMoves(markets, priorSnaps);

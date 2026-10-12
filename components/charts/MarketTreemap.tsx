@@ -179,7 +179,7 @@ export function MarketTreemap({ data }: { data: TreemapNode[] }) {
                   })
                 }
               >
-                <title>{`${leaf.title} — ${pct(leaf.prob, 0)}`}</title>
+                <title>{`${leaf.title} - ${pct(leaf.prob, 0)}`}</title>
                 <rect
                   x={r.x}
                   y={r.y}

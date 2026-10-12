@@ -4,6 +4,7 @@ import { fetchMarketById } from "@/lib/sources";
 import { displayTitle } from "@/lib/highlights";
 import { THEME_COLOURS } from "@/lib/themeColours";
 import { probFill } from "@/lib/format";
+import { SITE_URL } from "@/lib/site";
 
 // Per-market social-share card: the image that unfurls when a market link is
 // pasted into X / Slack / LinkedIn etc. Every shared link becomes a branded,
@@ -56,8 +57,8 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           <div style={{ fontSize: 66, fontWeight: 600, lineHeight: 1.12, letterSpacing: -1.5, maxWidth: 1010 }}>{title}</div>
           {prob != null ? (
             <div style={{ display: "flex", alignItems: "center", marginTop: 40 }}>
-              <div style={{ fontSize: 128, fontWeight: 700, letterSpacing: -3, marginRight: 40 }}>{`${Math.round(prob * 100)}%`}</div>
-              <div style={{ display: "flex", flexDirection: "column", flexGrow: 1 }}>
+              <div style={{ fontSize: 128, fontWeight: 700, letterSpacing: -3, marginRight: 40, flexShrink: 0 }}>{`${Math.round(prob * 100)}%`}</div>
+              <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: 0, minWidth: 0 }}>
                 <div style={{ display: "flex", width: "100%", height: 24, borderRadius: 12, background: "rgba(255,255,255,0.08)" }}>
                   <div style={{ display: "flex", width: `${Math.round(prob * 100)}%`, height: "100%", borderRadius: 12, background: probFill(prob) }} />
                 </div>
@@ -67,7 +68,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
           ) : null}
         </div>
 
-        <div style={{ fontSize: 24, color: MUTED }}>crowdwise-live.vercel.app · prediction-market odds on macro events</div>
+        <div style={{ fontSize: 24, color: MUTED }}>{`${new URL(SITE_URL).host} · prediction-market odds on macro events`}</div>
       </div>
     ),
     { ...size },
