@@ -109,7 +109,9 @@ export default async function HomePage() {
 
   return (
     <>
-      <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">Crowdwise</h1>
+      <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.02em]">
+        Crowd<span className="text-accent">wise</span>
+      </h1>
       <p className="mb-6 text-sm text-muted">
         Live odds on macro events - Fed decisions, inflation, recessions - from Kalshi and Polymarket.
       </p>

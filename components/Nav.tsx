@@ -17,7 +17,7 @@ export function Nav() {
     <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
       <Link
         href="/"
-        className="mr-2 flex items-center gap-2.5 text-[22px] font-semibold tracking-[-0.015em] text-[var(--text)]"
+        className="mr-2 flex items-center gap-1.5 text-[22px] font-semibold tracking-[-0.015em] text-[var(--text)]"
       >
         <svg width="28" height="28" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <circle cx="10" cy="10" r="8.2" stroke="#2f5a86" strokeWidth="1" />
@@ -27,7 +27,9 @@ export function Nav() {
           <circle cx="13.5" cy="5.2" r="1.6" fill="#fbbf24" />
           <circle cx="10" cy="10" r="1.4" fill="#4c9be8" />
         </svg>
-        Crowdwise
+        <span>
+          Crowd<span className="text-accent">wise</span>
+        </span>
       </Link>
       {LINKS.map(({ href, label }) => {
         const active = pathname?.startsWith(href);
