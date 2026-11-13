@@ -10,7 +10,7 @@ import type { BoardPayload } from "@/lib/types";
 const iso = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
 const payload: BoardPayload = {
-  fetchedAt: "2026-07-15T10:00:00",
+  fetchedAt: new Date().toISOString(),
   moves: { a: 0.05 },
   markets: [
     { id: "a", platform: "Kalshi", title: "Fed cut in March?", category: "Rates/Fed", prob: 0.6, volume: 1000, endDate: iso(3), status: "active", series: "KXFED", event: "E1" },
