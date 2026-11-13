@@ -13,7 +13,7 @@ async function findMarket(id: string, markets: Market[]): Promise<Market | null>
   return markets.find((x) => x.id === id) ?? (await fetchMarketById(id));
 }
 
-export const revalidate = 300;
+export const revalidate = 900;
 export const maxDuration = 60;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {

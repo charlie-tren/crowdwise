@@ -30,10 +30,10 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "Crowdwise", description: LEDE },
 };
 
-// ISR: the rendered board is cached and regenerated at most every 5 minutes, so
+// ISR: the rendered board is cached and regenerated at most every 15 minutes, so
 // public traffic is served from cache rather than hitting the upstream APIs on
 // every request. No external store (KV) or cron needed.
-export const revalidate = 300;
+export const revalidate = 900;
 export const maxDuration = 60;
 
 // The Atlanta Fed workbook is fetched with `cache: "no-store"` (it is >2 MB, over

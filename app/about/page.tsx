@@ -4,7 +4,7 @@ export const metadata: Metadata = {
   title: "About - Crowdwise",
   // Paired with the lede on this page - keep identical.
   description:
-    "Crowdwise shows live prediction-market probabilities across macro themes, pulled from the Kalshi and Polymarket public APIs and refreshed about every 10 minutes.",
+    "Crowdwise shows live prediction-market probabilities across macro themes, pulled from the Kalshi and Polymarket public APIs and refreshed about every 15 minutes.",
   alternates: { canonical: "/about" },
 };
 
@@ -14,7 +14,7 @@ export default function AboutPage() {
       <h1 className="text-[28px] font-semibold tracking-[-0.02em]">About</h1>
       <p className="mt-2 text-sm text-muted">
         Crowdwise shows live prediction-market probabilities across macro themes, pulled from the
-        Kalshi and Polymarket public APIs and refreshed about every 10 minutes.
+        Kalshi and Polymarket public APIs and refreshed about every 15 minutes.
       </p>
       <h2 className="mt-6 text-lg font-semibold">Data sources</h2>
       <ul className="mt-2 list-disc pl-5 text-sm text-muted">

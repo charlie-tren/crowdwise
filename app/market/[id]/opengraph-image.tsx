@@ -11,7 +11,7 @@ import { SITE_URL } from "@/lib/site";
 // odds-carrying advert. Cached like the board so unfurl bots don't hammer the
 // upstream APIs. Best-effort: falls back to a generic card if the market is gone.
 export const runtime = "nodejs";
-export const revalidate = 600;
+export const revalidate = 1800;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = "Crowdwise - live crowd odds on a macro event";

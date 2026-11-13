@@ -15,11 +15,11 @@ function fetchHistoryTrend(m: Market) {
     : fetchKalshiMarketHistory(m.series, m.id, { days: 30, periodInterval: 1440 });
 }
 
-// 7-day card sparklines for the whole default board. Cached (10 min) and fetched
+// 7-day card sparklines for the whole default board. Cached (30 min) and fetched
 // with a bounded concurrency pool (see buildSparklines) so covering every row
 // doesn't hammer the Kalshi/Polymarket history APIs. maxMarkets sits above the
 // representative board size (~130) so no visible row is left without a sparkline.
-export const revalidate = 600;
+export const revalidate = 1800;
 export const maxDuration = 60;
 
 export async function GET() {

@@ -5,7 +5,7 @@ import { computeTopMovers } from "@/lib/movers";
 import { displayTitle } from "@/lib/highlights";
 import { fetchKalshiMarketHistory, fetchPolymarketMarketHistory } from "@/lib/sources";
 
-export const revalidate = 600;
+export const revalidate = 1800;
 // A regeneration fetches price history for up to 40 markets. Measured at ~6-7s
 // locally with Polymarket unreachable, so longer from a US region where it is:
 // past the 10s default this route would be killed mid-flight and the chart would

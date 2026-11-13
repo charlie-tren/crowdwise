@@ -183,7 +183,7 @@ export function buildFedFuturesPath(rows: MptRow[]): FedFuturesPath | null {
 }
 
 // In-process cache of the tiny parsed result (the Fed updates daily). Keeps the
-// 2 MB download rare even though the page ISR-regenerates every 5 min; a warm
+// 2 MB download rare even though the page ISR-regenerates every 15 min; a warm
 // serverless instance reuses this. Serves stale on a later fetch failure.
 let _cache: { at: number; path: FedFuturesPath | null } | null = null;
 const CACHE_TTL_MS = 6 * 3_600_000;

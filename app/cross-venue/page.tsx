@@ -3,7 +3,7 @@ import { CrossVenueView } from "@/components/CrossVenueView";
 import { fetchTopMarkets } from "@/lib/board";
 import { findCrossVenue } from "@/lib/crossVenue";
 
-export const revalidate = 300;
+export const revalidate = 900;
 export const maxDuration = 60;
 export const metadata: Metadata = {
   title: "Kalshi vs Polymarket - Crowdwise",

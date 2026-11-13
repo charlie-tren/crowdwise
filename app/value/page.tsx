@@ -6,7 +6,7 @@ import { buildStrikeLadders } from "@/lib/relativeValue";
 import { ladderToDistribution, probsToDistribution, type Distribution } from "@/lib/distribution";
 import { fetchKalshiMarketHistory } from "@/lib/sources";
 
-export const revalidate = 300;
+export const revalidate = 900;
 export const maxDuration = 60;
 export const metadata: Metadata = {
   title: "Relative value - Crowdwise",
