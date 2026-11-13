@@ -6,3 +6,7 @@ node_modules/
 
 # TS incremental build cache
 tsconfig.tsbuildinfo
+
+# OpenNext / wrangler build output
+.open-next
+.wrangler
