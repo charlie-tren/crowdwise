@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/site";
 
+export const dynamic = "force-static";
+
 // robots.txt returned 404 before this, which is a soft failure: crawlers assume
 // allow-all, but nothing points them at the sitemap.
 export default function robots(): MetadataRoute.Robots {

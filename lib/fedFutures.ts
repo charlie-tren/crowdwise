@@ -5,11 +5,11 @@ import type { FedPathPoint } from "./highlights";
 // 3-month compounded average SOFR, estimated from CME options on SOFR futures. It
 // is the OIS/futures-implied rate path (WIRP-style) - a REAL-money comparator for
 // the site's prediction-market implied path. Published by a Federal Reserve Bank
-// (freely usable; attribute "Atlanta Fed / CME"). Only a 2 MB .xlsx is offered
+// (freely usable; attribute "Atlanta Fed / CME"). Only a ~7 MB .xlsx is offered
 // (no JSON feed), so we fetch + unzip + parse it here. Any failure degrades to
 // null and the home page falls back to the crowd-only path.
 export const ATLANTA_FED_MPT_URL =
-  "https://www.atlantafed.org/-/media/Project/Atlanta/FRBA/Documents/cenfis/market-probability-tracker/mpt_histdata.xlsx";
+  "https://www.atlantafed.org/-/media/Project/Atlanta/FRBA/Documents/research-and-data/data/market-probability-tracker/mpt_histdata.xlsx";
 
 // The Atlanta Fed site 403s non-browser user agents, so present a browser UA.
 const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
@@ -40,10 +40,11 @@ export interface FedFuturesPath {
 type BytesFetcher = (url: string) => Promise<Uint8Array>;
 
 const realBytesFetcher: BytesFetcher = async (url) => {
-  // NB: can't use Next's fetch data cache here - the workbook is >2 MB, over Next's
-  // per-item cache limit (it errors). We cache the tiny PARSED result in-process
-  // instead (see fetchFedFuturesPath), so the 2 MB download is rare.
-  const resp = await fetch(url, { headers: { "User-Agent": BROWSER_UA, Accept: "*/*" }, cache: "no-store" });
+  // No `cache: "no-store"`: in a static export build that throws a static-generation
+  // bailout and the overlay silently drops. The workbook (~7 MB) is over Next's 2 MB
+  // data-cache limit, so Next skips caching it with a warning; the PARSED result is
+  // cached in-process instead (see fetchFedFuturesPath).
+  const resp = await fetch(url, { headers: { "User-Agent": BROWSER_UA, Accept: "*/*" } });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return new Uint8Array(await resp.arrayBuffer());
 };
@@ -182,9 +183,8 @@ export function buildFedFuturesPath(rows: MptRow[]): FedFuturesPath | null {
   return { asOf: latest, currentRatePct, points };
 }
 
-// In-process cache of the tiny parsed result (the Fed updates daily). Keeps the
-// 2 MB download rare even though the page ISR-regenerates every 15 min; a warm
-// serverless instance reuses this. Serves stale on a later fetch failure.
+// In-process cache of the tiny parsed result (the Fed updates daily), so one build
+// downloads the workbook once. Serves stale on a later fetch failure.
 let _cache: { at: number; path: FedFuturesPath | null } | null = null;
 const CACHE_TTL_MS = 6 * 3_600_000;
 

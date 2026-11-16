@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { MarketMapView } from "@/components/MarketMapView";
-import { fetchTopMarkets } from "@/lib/board";
+import { getBuildBoard } from "@/lib/buildBoard";
 
-export const revalidate = 900;
-export const maxDuration = 60;
 export const metadata: Metadata = {
   title: "Market Map - Crowdwise",
   // Paired with the lede in components/MarketMapView.tsx - keep identical.
@@ -13,6 +11,6 @@ export const metadata: Metadata = {
 };
 
 export default async function MarketMapPage() {
-  const markets = await fetchTopMarkets();
+  const { markets } = await getBuildBoard();
   return <MarketMapView markets={markets} />;
 }

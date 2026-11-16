@@ -1,6 +1,6 @@
 # Crowdwise
 
-A public, read-only website showing live prediction-market probabilities (Kalshi + Polymarket) across macro themes - ported from the "Macro Signals" module of the author's Vantage app. Built with Next.js (App Router) + TypeScript + Tailwind v4 and Recharts. Data is cached with Next.js ISR so public traffic is served from cache rather than hitting the upstream APIs on every request.
+A public, read-only website showing live prediction-market probabilities (Kalshi + Polymarket) across macro themes - ported from the "Macro Signals" module of the author's Vantage app. Built with Next.js (App Router) + TypeScript + Tailwind v4 and Recharts.
 
 ## Local development
 
@@ -13,20 +13,21 @@ npm run build
 
 Notes:
 
-- Polymarket's Gamma API is blocked on some networks (including corporate/AU ISPs), so locally you may only see Kalshi markets. From a US-hosted Vercel deployment, Polymarket is reachable.
+- Polymarket's Gamma API is blocked on some networks (including corporate/AU ISPs), so locally you may only see Kalshi markets. The GitHub Actions build can reach it.
 
 ## Architecture
 
-Each page is an ISR (Incremental Static Regeneration) route with `revalidate = 300`: the rendered board is cached and regenerated at most once every 5 minutes, so the upstream APIs (Kalshi + Polymarket) are hit about once per interval per region rather than once per visitor. Per-market probability history comes from `/api/history/[series]/[ticker]` (Kalshi candlesticks, cached ~1h). The 7-day "top movers" chart is served by `/api/movers` (`revalidate = 600`), which computes candlestick deltas on demand. The data/calc layer lives in `lib/` and is fully unit-tested with Vitest.
+The site is a static export (`output: "export"`) served by a Cloudflare Worker with static assets, on the free plan. The board, every page, the `/api/board`, `/api/sparklines`, `/api/movers` and `/api/cross-venue` JSON and the OG images are built from one board fetch per build. The heartbeat Worker dispatches a `rebuild` to GitHub Actions every 15 minutes (the workflow's own schedule is the backup), which tests, builds and runs `wrangler deploy`. A build with an empty board fails, leaving the last deploy live.
 
-No external datastore or cron scheduler is required. A dormant KV path (`lib/kvClient.ts`, `/api/cron/refresh`) remains in the codebase: if a Vercel KV / Upstash store is later connected (setting `KV_REST_API_URL` + `KV_REST_API_TOKEN`), it can be re-enabled to add the "delta since last refresh" board chips and instant precomputed movers.
+`worker/index.ts` handles only what no static file matches: `/api/history/[series]/[ticker]` (Kalshi), `/api/poly-history/[token]` (Polymarket), `/api/market/[id]`, a client-rendered shell for a market that exists but was not built, and the 404 page. Responses are edge-cached for 5 minutes.
 
-## Vercel deploy checklist
+Market pages are built for the board plus off-board markets seen in the last 30 days (capped at 1,000). Each deploy publishes `/market-ids.json` and the next build reads it back.
 
-1. Import the repo into Vercel (Next.js preset auto-detected) and deploy - that's the core of it.
-2. Add a custom domain (Settings -> Domains) when ready.
+`npm run dev` does not serve the history routes; `npm run build && npm run preview` runs the Worker locally.
 
-That's all the app needs. `CRON_SECRET` (env var) and the GitHub Actions workflows are only relevant if you re-enable the optional KV path above.
+## Deploy
+
+Repo secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit) and `CLOUDFLARE_ACCOUNT_ID`. Master deploys; other refs dry-run.
 
 ## Not financial advice
 

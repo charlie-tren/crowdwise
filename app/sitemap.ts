@@ -1,10 +1,9 @@
 import type { MetadataRoute } from "next";
-import { fetchTopMarkets, representativeByEvent } from "@/lib/board";
+import { representativeByEvent } from "@/lib/board";
+import { getBuildBoard } from "@/lib/buildBoard";
 import { SITE_URL } from "@/lib/site";
 
-// Regenerate daily. The market set moves slowly and a sitemap is a discovery
-// hint, not a live feed.
-export const revalidate = 86_400;
+export const dynamic = "force-static";
 
 // How many market pages to list. Deliberately capped, and NOT set to the ~600
 // markets on the board: those pages are templated and near-identical, and
@@ -37,7 +36,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Best-effort: the venues rate-limit, and a sitemap that fails the build over
   // a 429 would be worse than one carrying only the static routes.
   try {
-    const markets = representativeByEvent(await fetchTopMarkets())
+    const markets = representativeByEvent((await getBuildBoard()).markets)
       .filter((m) => m.prob != null && m.volume > 0)
       .sort((a, b) => (b.volume || 0) - (a.volume || 0))
       .slice(0, MARKET_LIMIT);

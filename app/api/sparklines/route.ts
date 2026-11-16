@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { fetchTopMarkets, representativeByEvent } from "@/lib/board";
+import { representativeByEvent } from "@/lib/board";
+import { getBuildBoard } from "@/lib/buildBoard";
 import { buildSparklines } from "@/lib/sparklines";
 import { fetchKalshiMarketHistory, fetchPolymarketMarketHistory } from "@/lib/sources";
 import type { Market } from "@/lib/types";
@@ -15,16 +16,15 @@ function fetchHistoryTrend(m: Market) {
     : fetchKalshiMarketHistory(m.series, m.id, { days: 30, periodInterval: 1440 });
 }
 
-// 7-day card sparklines for the whole default board. Cached (30 min) and fetched
+// 7-day card sparklines for the whole default board, fetched
 // with a bounded concurrency pool (see buildSparklines) so covering every row
 // doesn't hammer the Kalshi/Polymarket history APIs. maxMarkets sits above the
 // representative board size (~130) so no visible row is left without a sparkline.
-export const revalidate = 1800;
-export const maxDuration = 60;
+export const dynamic = "force-static";
 
 export async function GET() {
   try {
-    const markets = await fetchTopMarkets();
+    const { markets } = await getBuildBoard();
     // Fetch history for the SAME representatives the board shows by default
     // (representativeByEvent), so the returned ids match the rendered card ids.
     const data = await buildSparklines(

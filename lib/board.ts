@@ -125,3 +125,10 @@ export function representativeByEvent(records: Market[]): Market[] {
   }
   return [...byEvent.values(), ...singles];
 }
+
+export function relatedMarkets(markets: Market[], m: Market): Market[] {
+  return representativeByEvent(markets)
+    .filter((r) => r.category === m.category && r.id !== m.id)
+    .sort((a, b) => (b.volume || 0) - (a.volume || 0))
+    .slice(0, 6);
+}

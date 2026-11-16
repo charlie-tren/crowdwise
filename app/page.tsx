@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { unstable_cache } from "next/cache";
 import { BoardView } from "@/components/BoardView";
 import { HeadlineOdds } from "@/components/HeadlineOdds";
 import { EventCalendar } from "@/components/EventCalendar";
@@ -10,7 +9,7 @@ import { FedPathChart } from "@/components/charts/FedPathChart";
 import { FedPathGrid } from "@/components/charts/FedPathGrid";
 import { FedPathOverlay } from "@/components/charts/FedPathOverlay";
 import { CentralBankGrid } from "@/components/charts/CentralBankGrid";
-import { fetchTopMarkets } from "@/lib/board";
+import { getBuildBoard } from "@/lib/buildBoard";
 import { headlineOdds, fedHeadlineTile, fedDistribution, fedPath, fedMeetingGrid } from "@/lib/highlights";
 import { fetchFedFuturesPath, buildOverlaySeries } from "@/lib/fedFutures";
 import { buildEventCalendar } from "@/lib/calendar";
@@ -30,28 +29,9 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "Crowdwise", description: LEDE },
 };
 
-// ISR: the rendered board is cached and regenerated at most every 15 minutes, so
-// public traffic is served from cache rather than hitting the upstream APIs on
-// every request. No external store (KV) or cron needed.
-export const revalidate = 900;
-export const maxDuration = 60;
-
-// The Atlanta Fed workbook is fetched with `cache: "no-store"` (it is >2 MB, over
-// Next's per-item data-cache limit). An uncached fetch on the render path opts the
-// WHOLE route out of static generation, which made `/` the only dynamic page on the
-// site: every visit re-ran the board fetch, the 2 MB download and the sparklines,
-// and <Link> could not prefetch it, so clicking the logo took seconds. Wrapping the
-// call in its own cache scope keeps the download off the route's dynamic tracking
-// and caches the tiny PARSED result instead. The Fed updates the file daily.
-const cachedFedFuturesPath = unstable_cache(
-  () => fetchFedFuturesPath(),
-  ["atlanta-fed-mpt-path"],
-  { revalidate: 21_600, tags: ["fed-futures"] },
-);
-
 async function getBoard(): Promise<BoardPayload> {
-  const markets = await fetchTopMarkets();
-  return { markets, moves: {}, fetchedAt: new Date().toISOString() };
+  const { markets, builtAt } = await getBuildBoard();
+  return { markets, moves: {}, fetchedAt: builtAt };
 }
 
 export default async function HomePage() {
@@ -75,7 +55,7 @@ export default async function HomePage() {
 
   // OIS/SOFR futures-implied path (Atlanta Fed) to overlay against the crowd path.
   // Best-effort: null (fetch/parse failure) falls back to the crowd-only chart.
-  const fedFutures = path.length >= 2 ? await cachedFedFuturesPath() : null;
+  const fedFutures = path.length >= 2 ? await fetchFedFuturesPath() : null;
   const overlay = fedFutures ? buildOverlaySeries(fedFutures, path, now.getTime()) : [];
 
   // Central banks: the crowd's odds of a rise before 2027 for seven banks, beside

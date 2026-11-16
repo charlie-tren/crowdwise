@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { fetchTopMarkets } from "@/lib/board";
+import { getBuildBoard } from "@/lib/buildBoard";
 import { findCrossVenue } from "@/lib/crossVenue";
 
-export const revalidate = 900;
-export const maxDuration = 60;
+export const dynamic = "force-static";
 
 export async function GET() {
-  const markets = await fetchTopMarkets();
+  const { markets } = await getBuildBoard();
   const pairs = findCrossVenue(markets);
   return NextResponse.json({
     count: pairs.length,

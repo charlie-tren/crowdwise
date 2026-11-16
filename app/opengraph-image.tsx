@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 // Site-wide social-share card (homepage + any route without its own image).
-export const runtime = "nodejs";
+export const dynamic = "force-static";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = "Crowdwise - live prediction-market odds on the Fed, inflation, recession and oil";

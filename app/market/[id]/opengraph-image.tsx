@@ -1,6 +1,5 @@
 import { ImageResponse } from "next/og";
-import { fetchTopMarkets } from "@/lib/board";
-import { fetchMarketById } from "@/lib/sources";
+import { findBuiltMarket, marketParams } from "@/lib/buildBoard";
 import { displayTitle } from "@/lib/highlights";
 import { THEME_COLOURS } from "@/lib/themeColours";
 import { probFill } from "@/lib/format";
@@ -8,10 +7,9 @@ import { SITE_URL } from "@/lib/site";
 
 // Per-market social-share card: the image that unfurls when a market link is
 // pasted into X / Slack / LinkedIn etc. Every shared link becomes a branded,
-// odds-carrying advert. Cached like the board so unfurl bots don't hammer the
-// upstream APIs. Best-effort: falls back to a generic card if the market is gone.
-export const runtime = "nodejs";
-export const revalidate = 1800;
+// odds-carrying advert. Rendered at build; the fallback shell gets the generic card.
+export const dynamic = "force-static";
+export const generateStaticParams = marketParams;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const alt = "Crowdwise - live crowd odds on a macro event";
@@ -26,9 +24,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const id = decodeURIComponent(raw);
   let market = null;
   try {
-    // Same by-id fallback as the page: the top-set shifts between requests, so
-    // don't serve the generic card for a market that really exists.
-    market = (await fetchTopMarkets()).find((x) => x.id === id) ?? (await fetchMarketById(id));
+    market = await findBuiltMarket(id);
   } catch {
     /* fall back to the generic card */
   }

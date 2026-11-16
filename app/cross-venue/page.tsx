@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { CrossVenueView } from "@/components/CrossVenueView";
-import { fetchTopMarkets } from "@/lib/board";
+import { getBuildBoard } from "@/lib/buildBoard";
 import { findCrossVenue } from "@/lib/crossVenue";
 
-export const revalidate = 900;
-export const maxDuration = 60;
 export const metadata: Metadata = {
   title: "Kalshi vs Polymarket - Crowdwise",
   // Paired with the lede in components/CrossVenueView.tsx - keep identical.
@@ -14,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function CrossVenuePage() {
-  const markets = await fetchTopMarkets();
+  const { markets } = await getBuildBoard();
   const pairs = findCrossVenue(markets);
   return <CrossVenueView pairs={pairs} />;
 }

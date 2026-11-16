@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { ScenarioMap } from "@/components/scenarioMap/ScenarioMap";
-import { fetchTopMarkets } from "@/lib/board";
+import { getBuildBoard } from "@/lib/buildBoard";
 
-export const revalidate = 900;
-export const maxDuration = 60;
 export const metadata: Metadata = {
   title: "Scenario Map - Crowdwise",
   // The page carries no standfirst: this sentence exists for a share card, where
@@ -14,6 +12,6 @@ export const metadata: Metadata = {
 };
 
 export default async function ScenarioPage() {
-  const markets = await fetchTopMarkets();
+  const { markets } = await getBuildBoard();
   return <ScenarioMap markets={markets} />;
 }

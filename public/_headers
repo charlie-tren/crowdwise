@@ -1,0 +1,8 @@
+/api/*
+  Content-Type: application/json; charset=utf-8
+
+/opengraph-image
+  Content-Type: image/png
+
+/market/*/opengraph-image
+  Content-Type: image/png

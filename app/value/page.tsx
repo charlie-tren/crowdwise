@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import { StrikeLadders } from "@/components/StrikeLadders";
 import { DistributionCurve } from "@/components/charts/DistributionCurve";
-import { fetchTopMarkets } from "@/lib/board";
+import { getBuildBoard } from "@/lib/buildBoard";
 import { buildStrikeLadders } from "@/lib/relativeValue";
 import { ladderToDistribution, probsToDistribution, type Distribution } from "@/lib/distribution";
 import { fetchKalshiMarketHistory } from "@/lib/sources";
 
-export const revalidate = 900;
-export const maxDuration = 60;
 export const metadata: Metadata = {
   title: "Relative value - Crowdwise",
   // Paired with the lede on this page - keep identical.
@@ -23,7 +21,7 @@ function periodLabel(period: string): string {
 }
 
 export default async function ValuePage() {
-  const markets = await fetchTopMarkets();
+  const { markets } = await getBuildBoard();
   const ladders = buildStrikeLadders(markets);
   const flagged = ladders.filter((l) => l.hasViolation).length;
 
