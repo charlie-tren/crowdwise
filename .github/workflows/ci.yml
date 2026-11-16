@@ -1,8 +1,8 @@
 name: CI
 
 # The site is a static export served by a Cloudflare Worker. The board is baked in
-# at build, so the heartbeat Worker dispatches `rebuild` every 15 min; the schedule
-# is the backup. Master deploys; every other ref dry-runs the Worker bundle.
+# at build, so the heartbeat Worker dispatches `rebuild` every 15 min; the hourly
+# schedule is the backup. Master deploys; every other ref dry-runs the Worker bundle.
 on:
   push:
     branches: [master]
@@ -10,7 +10,7 @@ on:
   repository_dispatch:
     types: [rebuild]
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "7 * * * *"
   workflow_dispatch:
 
 concurrency:
