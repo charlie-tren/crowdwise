@@ -14,10 +14,10 @@ const LINKS = [
 export function Nav() {
   const pathname = usePathname();
   return (
-    <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+    <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 max-sm:gap-x-4">
       <Link
         href="/"
-        className="mr-2 flex items-center gap-1.5 text-[22px] font-semibold tracking-[-0.015em] text-[var(--text)]"
+        className="mr-2 flex items-center gap-1.5 max-sm:mr-0 text-[22px] font-semibold tracking-[-0.015em] text-[var(--text)]"
       >
         <svg width="28" height="28" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <circle cx="10" cy="10" r="8.2" stroke="#2f5a86" strokeWidth="1" />
@@ -31,6 +31,7 @@ export function Nav() {
           Crowd<span className="text-accent">wise</span>
         </span>
       </Link>
+      <div className="flex items-center gap-x-6 max-sm:order-last max-sm:w-full max-sm:justify-between max-sm:gap-x-2">
       {LINKS.map(({ href, label }) => {
         const active = pathname?.startsWith(href);
         return (
@@ -49,7 +50,8 @@ export function Nav() {
           </Link>
         );
       })}
-      <div className="ml-auto flex items-center gap-3">
+      </div>
+      <div className="ml-auto flex items-center gap-3 max-sm:gap-2">
         <span className="flex items-center gap-2 text-[13px] text-muted">
           <span className="h-1.5 w-1.5 animate-softpulse rounded-full bg-accent" />
           Live
@@ -58,7 +60,7 @@ export function Nav() {
           href="https://charlietrenorden.com/"
           className="rounded-full border border-white/10 px-2.5 py-1 text-[12px] text-muted transition-colors hover:border-white/25 hover:text-[var(--text)]"
         >
-          <span aria-hidden="true">←</span>&nbsp;Other projects
+          <span aria-hidden="true" style={{ fontSize: "calc(1em + 1.5px)", position: "relative", top: "-1.5px" }}>←</span>&nbsp;Other projects
         </a>
       </div>
     </nav>
